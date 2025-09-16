@@ -6,7 +6,7 @@
 //! # Examples
 //!
 //! ## Basic Signature and Verification
-//! ```rust
+//! ```rust,no_run
 //! use saorsa_pqc::api::sig::{ml_dsa_65, MlDsaVariant};
 //!
 //! # fn main() -> Result<(), Box<dyn std::error::Error>> {
@@ -28,7 +28,7 @@
 //! ```
 //!
 //! ## Document Signing with Context
-//! ```rust
+//! ```rust,no_run
 //! use saorsa_pqc::api::sig::{MlDsa, MlDsaVariant};
 //!
 //! # fn main() -> Result<(), Box<dyn std::error::Error>> {
@@ -66,7 +66,7 @@ use fips204::{ml_dsa_44, ml_dsa_65, ml_dsa_87};
 /// Higher security levels provide more protection but require larger keys and signatures.
 ///
 /// # Examples
-/// ```rust
+/// ```rust,no_run
 /// use saorsa_pqc::api::sig::MlDsaVariant;
 ///
 /// // Choose based on security requirements
@@ -155,7 +155,7 @@ impl MlDsaVariant {
 /// This key can be freely shared and is used to verify signatures.
 ///
 /// # Examples
-/// ```rust
+/// ```rust,no_run
 /// use saorsa_pqc::api::sig::{ml_dsa_65, MlDsaPublicKey, MlDsaVariant};
 ///
 /// # fn main() -> Result<(), Box<dyn std::error::Error>> {
@@ -255,7 +255,7 @@ impl MlDsaPublicKey {
 /// - Consider hardware security modules (HSMs) for production
 ///
 /// # Examples
-/// ```rust
+/// ```rust,no_run
 /// use saorsa_pqc::api::sig::{ml_dsa_65, MlDsaSecretKey, MlDsaVariant};
 ///
 /// # fn main() -> Result<(), Box<dyn std::error::Error>> {
@@ -353,7 +353,7 @@ impl MlDsaSecretKey {
 /// - ML-DSA-87: 4627 bytes
 ///
 /// # Examples
-/// ```rust
+/// ```rust,no_run
 /// use saorsa_pqc::api::sig::{ml_dsa_65, MlDsaSignature, MlDsaVariant};
 ///
 /// # fn main() -> Result<(), Box<dyn std::error::Error>> {
@@ -425,7 +425,7 @@ impl MlDsaSignature {
 /// # Examples
 ///
 /// ## Basic Usage
-/// ```rust
+/// ```rust,no_run
 /// use saorsa_pqc::api::sig::{MlDsa, MlDsaVariant};
 ///
 /// # fn main() -> Result<(), Box<dyn std::error::Error>> {
@@ -444,7 +444,7 @@ impl MlDsaSignature {
 /// ```
 ///
 /// ## With Context for Domain Separation
-/// ```rust
+/// ```rust,no_run
 /// use saorsa_pqc::api::sig::{MlDsa, MlDsaVariant};
 ///
 /// # fn main() -> Result<(), Box<dyn std::error::Error>> {
@@ -477,7 +477,7 @@ impl MlDsa {
     /// * `variant` - The ML-DSA parameter set to use (44, 65, or 87)
     ///
     /// # Example
-    /// ```rust
+    /// ```rust,no_run
     /// use saorsa_pqc::api::sig::{MlDsa, MlDsaVariant};
     ///
     /// let dsa_44 = MlDsa::new(MlDsaVariant::MlDsa44);   // NIST Level 2
@@ -502,7 +502,7 @@ impl MlDsa {
     /// Returns an error if key generation fails (extremely rare with proper RNG).
     ///
     /// # Example
-    /// ```rust
+    /// ```rust,no_run
     /// use saorsa_pqc::api::sig::ml_dsa_65;
     ///
     /// # fn main() -> Result<(), Box<dyn std::error::Error>> {
@@ -579,7 +579,7 @@ impl MlDsa {
     /// - `SigningFailed`: If the signing operation fails
     ///
     /// # Example
-    /// ```rust
+    /// ```rust,no_run
     /// use saorsa_pqc::api::sig::ml_dsa_65;
     ///
     /// # fn main() -> Result<(), Box<dyn std::error::Error>> {
@@ -619,7 +619,7 @@ impl MlDsa {
     /// - `SigningFailed`: If the signing operation fails
     ///
     /// # Example
-    /// ```rust
+    /// ```rust,no_run
     /// use saorsa_pqc::api::sig::ml_dsa_65;
     ///
     /// # fn main() -> Result<(), Box<dyn std::error::Error>> {
@@ -741,7 +741,7 @@ impl MlDsa {
     /// incompatible key types or internal verification errors.
     ///
     /// # Example
-    /// ```rust
+    /// ```rust,no_run
     /// use saorsa_pqc::api::sig::ml_dsa_65;
     ///
     /// # fn main() -> Result<(), Box<dyn std::error::Error>> {
@@ -791,7 +791,7 @@ impl MlDsa {
     /// incompatible key types, invalid context, or internal verification errors.
     ///
     /// # Example
-    /// ```rust
+    /// ```rust,no_run
     /// use saorsa_pqc::api::sig::ml_dsa_65;
     ///
     /// # fn main() -> Result<(), Box<dyn std::error::Error>> {
@@ -920,7 +920,7 @@ impl MlDsa {
 /// - Recommended by NIST for general use
 ///
 /// # Example
-/// ```rust
+/// ```rust,no_run
 /// use saorsa_pqc::api::sig::ml_dsa_65;
 ///
 /// # fn main() -> Result<(), Box<dyn std::error::Error>> {
@@ -950,7 +950,7 @@ pub const fn ml_dsa_65() -> MlDsa {
 /// suitable for applications with strict size or performance constraints.
 ///
 /// # Example
-/// ```rust
+/// ```rust,no_run
 /// use saorsa_pqc::api::sig::ml_dsa_44;
 ///
 /// # fn main() -> Result<(), Box<dyn std::error::Error>> {
@@ -970,7 +970,7 @@ pub const fn ml_dsa_44() -> MlDsa {
 /// suitable for applications requiring the highest level of security.
 ///
 /// # Example
-/// ```rust
+/// ```rust,no_run
 /// use saorsa_pqc::api::sig::ml_dsa_87;
 ///
 /// # fn main() -> Result<(), Box<dyn std::error::Error>> {

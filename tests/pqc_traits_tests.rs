@@ -9,28 +9,6 @@ use saorsa_pqc::pqc::{
     blake3_helpers, ConstantTimeCompare, Kem, MlDsa44Trait, MlDsa65Trait, MlDsa87Trait,
     MlKem1024Trait, MlKem512Trait, MlKem768Trait, SecureBuffer, Sig,
 };
-use serde::{Deserialize, Serialize};
-use std::fmt::Debug;
-
-/// Test vector for KEM operations
-#[derive(Debug, Serialize, Deserialize)]
-struct KemTestVector {
-    name: String,
-    seed: Vec<u8>,
-    expected_pk_hash: String,
-    expected_ct_hash: String,
-    expected_ss_hash: String,
-}
-
-/// Test vector for signature operations
-#[derive(Debug, Serialize, Deserialize)]
-struct SigTestVector {
-    name: String,
-    seed: Vec<u8>,
-    message: Vec<u8>,
-    expected_pk_hash: String,
-    expected_sig_hash: String,
-}
 
 /// Generic KEM test helper
 fn test_kem_roundtrip<K: Kem>()
