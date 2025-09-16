@@ -41,7 +41,7 @@ jobs:
       run: cargo fmt -- --check
     
     - name: Run clippy
-      run: cargo clippy --all-targets --all-features
+      run: RUSTFLAGS="" cargo clippy --all-targets --all-features
 
   # Unit and integration tests
   test:
