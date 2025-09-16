@@ -123,8 +123,10 @@ slh-dsa = "0.0.3"  # Alternative SLH-DSA implementation for cross-validation
 # Note: cargo-mutants is a binary tool and should be installed with: cargo install cargo-mutants
 libfuzzer-sys = "0.4"
 arbitrary = { version = "1.3", features = ["derive"] }
-honggfuzz = "0.5"
 mutants = "0.0.3"
+
+[target.'cfg(not(target_os = "windows"))'.dev-dependencies]
+honggfuzz = "0.5"
 
 
 # Test configuration for specific test suites

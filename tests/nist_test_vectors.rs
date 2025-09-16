@@ -471,6 +471,7 @@ mod ml_dsa_tests {
 mod slh_dsa_tests {
     use super::*;
 
+    #[cfg_attr(tarpaulin, ignore)]
     #[test]
     fn test_slh_dsa_shake_128s() {
         let message = b"Test message for SLH-DSA-SHAKE-128s";
