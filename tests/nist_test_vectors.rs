@@ -14,6 +14,7 @@
     clippy::single_component_path_imports,
     clippy::manual_range_contains
 )]
+#![cfg_attr(test, allow(unexpected_cfgs))]
 
 use serde::{Deserialize, Serialize};
 use serde_json;
