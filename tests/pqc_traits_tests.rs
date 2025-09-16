@@ -378,6 +378,14 @@ fn test_zeroization_api() {
     // After zeroization, all bytes should be zero
     // Note: This test doesn't guarantee the compiler won't optimize it away
     // Proper verification requires tools like Valgrind or memory inspection
-    assert_eq!(buffer.as_ref().first(), Some(&0), "Buffer should be zeroized");
-    assert_eq!(buffer.as_ref().get(31), Some(&0), "Buffer should be zeroized");
+    assert_eq!(
+        buffer.as_ref().first(),
+        Some(&0),
+        "Buffer should be zeroized"
+    );
+    assert_eq!(
+        buffer.as_ref().get(31),
+        Some(&0),
+        "Buffer should be zeroized"
+    );
 }

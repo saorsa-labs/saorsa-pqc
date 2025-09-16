@@ -130,6 +130,7 @@ pub mod api;
 pub use api::{
     // Utils
     init as api_init,
+    kdf::helpers as kdf_helpers,
     // Convenience functions
     kem::ml_kem_768,
     sig::ml_dsa_65,
@@ -137,6 +138,10 @@ pub use api::{
 
     supported_algorithms,
     version as api_version,
+    // KDF exports
+    HkdfSha3_256,
+    HkdfSha3_512,
+    KdfAlgorithm,
     MlDsa,
     MlDsaPublicKey as ApiMlDsaPublicKey,
     MlDsaSecretKey as ApiMlDsaSecretKey,
@@ -159,11 +164,6 @@ pub use api::{
     SlhDsaSignature,
 
     SlhDsaVariant,
-    // KDF exports
-    HkdfSha3_256,
-    HkdfSha3_512,
-    KdfAlgorithm,
-    kdf::helpers as kdf_helpers,
 };
 
 // Re-export the most commonly used types and traits for convenience (legacy)
