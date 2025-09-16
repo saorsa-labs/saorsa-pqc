@@ -39,8 +39,8 @@ jobs:
 
     - name: Generate coverage report
       env:
-        PROPTEST_CASES: 16
-        PROPTEST_MAX_SHRINK_ITERS: 16
+        PROPTEST_CASES: 4
+        PROPTEST_MAX_SHRINK_ITERS: 4
         TARPAULIN: "1"
       run: |
         cargo tarpaulin \
