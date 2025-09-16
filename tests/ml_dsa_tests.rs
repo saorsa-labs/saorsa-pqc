@@ -455,6 +455,10 @@ fn test_ml_dsa_signature_determinism() -> Result<(), Box<dyn std::error::Error>>
 /// Test ML-DSA-65 performance characteristics
 #[test]
 fn test_ml_dsa_performance() -> Result<(), Box<dyn std::error::Error>> {
+    if std::env::var("TARPAULIN").is_ok() {
+        eprintln!("Skipping performance timing under coverage instrumentation");
+        return Ok(());
+    }
     let ml_dsa = ml_dsa_65();
 
     // Warm up
@@ -477,21 +481,28 @@ fn test_ml_dsa_performance() -> Result<(), Box<dyn std::error::Error>> {
     let _ = ml_dsa.verify(&public_key, message, &signature)?;
     let verify_time = start.elapsed();
 
-    // Performance bounds (generous for CI environments)
+    let ci_mode = std::env::var("CI").is_ok();
+    let keygen_limit = if ci_mode { 400 } else { 200 };
+    let sign_limit = if ci_mode { 200 } else { 100 };
+    let verify_limit = if ci_mode { 200 } else { 50 };
+
     assert!(
-        keygen_time.as_millis() < 200,
-        "Key generation too slow: {}ms",
-        keygen_time.as_millis()
+        keygen_time.as_millis() < keygen_limit,
+        "Key generation too slow: {}ms (limit {}ms)",
+        keygen_time.as_millis(),
+        keygen_limit
     );
     assert!(
-        sign_time.as_millis() < 100,
-        "Signing too slow: {}ms",
-        sign_time.as_millis()
+        sign_time.as_millis() < sign_limit,
+        "Signing too slow: {}ms (limit {}ms)",
+        sign_time.as_millis(),
+        sign_limit
     );
     assert!(
-        verify_time.as_millis() < 50,
-        "Verification too slow: {}ms",
-        verify_time.as_millis()
+        verify_time.as_millis() < verify_limit,
+        "Verification too slow: {}ms (limit {}ms)",
+        verify_time.as_millis(),
+        verify_limit
     );
 
     println!("ML-DSA-65 Performance:");
