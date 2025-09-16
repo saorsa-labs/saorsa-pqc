@@ -44,6 +44,7 @@ jobs:
         TARPAULIN: "1"
       run: |
         cargo tarpaulin \
+          --engine llvm \
           --all-features \
           --timeout 300 \
           --out Xml \
