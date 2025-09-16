@@ -30,6 +30,6 @@ jobs:
       run: |
         echo "Running quick CI checks..."
         cargo fmt -- --check
-        cargo clippy --all-targets --all-features
-        cargo test --lib
+        cargo clippy --all-targets --all-features -- -D clippy::panic -D clippy::unwrap_used -D clippy::expect_used -W clippy::pedantic
+        cargo test --lib --all-features
         echo "✅ All quick checks passed!"

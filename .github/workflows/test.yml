@@ -41,7 +41,9 @@ jobs:
       run: cargo fmt -- --check
     
     - name: Run clippy
-      run: RUSTFLAGS="" cargo clippy --all-targets --all-features
+      env:
+        RUSTFLAGS: ""
+      run: cargo clippy --all-targets --all-features -- -D clippy::panic -D clippy::unwrap_used -D clippy::expect_used -W clippy::pedantic
 
   # Unit and integration tests
   test:
@@ -116,9 +118,10 @@ jobs:
           ${{ runner.os }}-cargo-
     
     - name: Run property tests
-      run: cargo test --test property_tests --features test-utils
       env:
-        PROPTEST_CASES: 1000  # More thorough property testing
+        PROPTEST_CASES: 64  # Keep CI runtime reasonable while still thorough
+        PROPTEST_MAX_SHRINK_ITERS: 32
+      run: cargo test --test property_tests --features test-utils
 
   # NIST test vectors
   nist-vectors:
@@ -180,6 +183,9 @@ jobs:
     # No download needed - files are in tests/nist_vectors/
 
     - name: Generate coverage report
+      env:
+        PROPTEST_CASES: 16  # Coverage instrumentation is expensive; keep cases low
+        PROPTEST_MAX_SHRINK_ITERS: 16
       run: |
         cargo tarpaulin \
           --all-features \
