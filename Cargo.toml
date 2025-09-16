@@ -114,7 +114,6 @@ lazy_static = "1.4"
 tempfile = "3.8"
 
 # For performance profiling
-pprof = { version = "0.15", features = ["flamegraph"] }
 
 # Additional test dependencies
 slh-dsa = "0.0.3"  # Alternative SLH-DSA implementation for cross-validation
@@ -127,6 +126,7 @@ mutants = "0.0.3"
 
 [target.'cfg(not(target_os = "windows"))'.dev-dependencies]
 honggfuzz = "0.5"
+pprof = { version = "0.15", features = ["flamegraph"] }
 
 
 # Test configuration for specific test suites

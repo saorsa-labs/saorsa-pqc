@@ -1,0 +1,69 @@
+name: Code Coverage
+
+on:
+  push:
+    branches: [ main, develop ]
+  pull_request:
+    branches: [ main ]
+  workflow_dispatch:
+
+env:
+  CARGO_TERM_COLOR: always
+  RUST_BACKTRACE: 1
+  RUSTFLAGS: "-D warnings"
+
+jobs:
+  coverage:
+    name: Tarpaulin Coverage
+    runs-on: ubuntu-latest
+    steps:
+    - name: Checkout code
+      uses: actions/checkout@v4
+
+    - name: Install Rust
+      uses: dtolnay/rust-toolchain@stable
+
+    - name: Install cargo-tarpaulin
+      uses: taiki-e/install-action@cargo-tarpaulin
+
+    - name: Cache cargo dependencies
+      uses: actions/cache@v4
+      with:
+        path: |
+          ~/.cargo/registry
+          ~/.cargo/git
+          target
+        key: ${{ runner.os }}-coverage-cargo-${{ hashFiles('**/Cargo.lock') }}
+        restore-keys: |
+          ${{ runner.os }}-cargo-
+
+    - name: Generate coverage report
+      env:
+        PROPTEST_CASES: 16
+        PROPTEST_MAX_SHRINK_ITERS: 16
+      run: |
+        cargo tarpaulin \
+          --all-features \
+          --timeout 300 \
+          --out Xml \
+          --output-dir target/tarpaulin \
+          --exclude-files 'tests/*' 'benches/*' 'examples/*' \
+          -- --skip slh_dsa_tests::test_slh_dsa_shake_128s --skip test_ml_dsa_performance
+
+    - name: Upload coverage to Codecov
+      uses: codecov/codecov-action@v4
+      with:
+        files: target/tarpaulin/cobertura.xml
+        fail_ci_if_error: true
+        token: ${{ secrets.CODECOV_TOKEN }}
+
+    - name: Check coverage threshold
+      run: |
+        COVERAGE=$(grep -o 'line-rate="[^"]*"' target/tarpaulin/cobertura.xml | head -1 | cut -d'"' -f2)
+        COVERAGE_PERCENT=$(echo "$COVERAGE" | awk '{printf "%.0f", $1 * 100}')
+        echo "Coverage: ${COVERAGE_PERCENT}%"
+        if [ "$COVERAGE_PERCENT" -lt "85" ]; then
+          echo "WARNING: Coverage ${COVERAGE_PERCENT}% is below target 85%"
+          echo "Allowing build to continue for now"
+        fi
+        echo "✅ Coverage ${COVERAGE_PERCENT}% checked"

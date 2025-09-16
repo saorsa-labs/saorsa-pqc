@@ -1,0 +1,54 @@
+name: Cross Platform Builds
+
+on:
+  push:
+    branches: [ main, develop ]
+  pull_request:
+    branches: [ main ]
+  workflow_dispatch:
+
+env:
+  CARGO_TERM_COLOR: always
+  RUST_BACKTRACE: 1
+  RUSTFLAGS: "-D warnings"
+
+jobs:
+  cross-platform:
+    name: Cross Platform
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - os: windows-latest
+            target: x86_64-pc-windows-msvc
+          - os: macos-latest
+            target: x86_64-apple-darwin
+          - os: macos-latest
+            target: aarch64-apple-darwin
+    runs-on: ${{ matrix.os }}
+    steps:
+    - name: Checkout code
+      uses: actions/checkout@v4
+
+    - name: Install Rust
+      uses: dtolnay/rust-toolchain@stable
+      with:
+        targets: ${{ matrix.target }}
+
+    - name: Cache cargo dependencies
+      uses: actions/cache@v4
+      with:
+        path: |
+          ~/.cargo/registry
+          ~/.cargo/git
+          target
+        key: ${{ matrix.os }}-${{ matrix.target }}-cargo-${{ hashFiles('**/Cargo.lock') }}
+        restore-keys: |
+          ${{ matrix.os }}-cargo-
+
+    - name: Build for target
+      run: cargo build --target ${{ matrix.target }} --all-features
+
+    - name: Run tests (native only)
+      if: matrix.target == 'x86_64-pc-windows-msvc' || matrix.target == 'x86_64-apple-darwin' || (matrix.target == 'aarch64-apple-darwin' && runner.arch == 'ARM64')
+      run: cargo test --target ${{ matrix.target }} --all-features
