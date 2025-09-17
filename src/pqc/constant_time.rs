@@ -3,6 +3,7 @@
 //! This module provides constant-time comparison and conditional operations
 //! to prevent timing attacks on sensitive cryptographic data.
 
+use core::hint::black_box;
 use subtle::{Choice, ConditionallySelectable, ConstantTimeEq, CtOption};
 use zeroize::Zeroize;
 
@@ -10,13 +11,40 @@ use zeroize::Zeroize;
 ///
 /// Returns true if the slices are equal, false otherwise.
 /// The comparison runs in constant time regardless of where differences occur.
-#[inline]
+///
+/// # Security Note
+/// This function is designed to be constant-time to prevent timing attacks.
+/// The length comparison is also performed in constant-time.
 #[must_use]
 pub fn ct_eq(a: &[u8], b: &[u8]) -> bool {
-    if a.len() != b.len() {
-        return false;
+    // Constant-time length comparison
+    let len_equal = a.len().ct_eq(&b.len());
+
+    // Pad the shorter slice conceptually to avoid early returns
+    // We'll compare up to the maximum length
+    let max_len = a.len().max(b.len());
+    let min_len = a.len().min(b.len());
+
+    // Compare the common portion
+    let mut content_equal = Choice::from(1u8);
+    for i in 0..min_len {
+        content_equal &= a[i].ct_eq(&b[i]);
     }
-    a.ct_eq(b).into()
+
+    // For the remaining portion (if lengths differ),
+    // we still need to do work to maintain constant time
+    for _ in min_len..max_len {
+        // Perform dummy operations to maintain constant time
+        // Use black_box to prevent optimization
+        let dummy = black_box(0u8);
+        content_equal &= dummy.ct_eq(&dummy);
+    }
+
+    // Both lengths and contents must be equal
+    let result = len_equal & content_equal;
+
+    // Use black_box to prevent the compiler from optimizing away the comparison
+    black_box(result.into())
 }
 
 /// Constant-time conditional selection
@@ -177,10 +205,11 @@ pub fn ct_verify<T>(condition: bool, value: T) -> CtOption<T> {
 /// Constant-time byte array comparison
 ///
 /// Compares two fixed-size byte arrays in constant time.
-#[inline]
 #[must_use]
 pub fn ct_array_eq<const N: usize>(a: &[u8; N], b: &[u8; N]) -> bool {
-    a.ct_eq(b).into()
+    // Use black_box to prevent optimization
+    let result = a.ct_eq(b);
+    black_box(result.into())
 }
 
 /// Clear sensitive data from memory in constant time
