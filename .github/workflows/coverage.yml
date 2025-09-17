@@ -53,8 +53,8 @@ jobs:
           -- --skip slh_dsa_tests::test_slh_dsa_shake_128s --skip test_ml_dsa_performance
 
     - name: Upload coverage to Codecov
-      if: ${{ secrets.CODECOV_TOKEN != '' }}
       uses: codecov/codecov-action@v4
+      continue-on-error: true
       with:
         files: target/tarpaulin/cobertura.xml
         fail_ci_if_error: false
