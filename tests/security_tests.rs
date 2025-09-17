@@ -83,7 +83,11 @@ fn test_constant_time_comparison() {
         println!("Constant-time comparison timing:");
         println!("  Equal times: {:?}", avg_equal);
         println!("  Unequal times: {:?}", avg_unequal);
-        println!("  Ratio: {:.2}x (tolerance: {:.1}x)", ratio, 1.0 + tolerance);
+        println!(
+            "  Ratio: {:.2}x (tolerance: {:.1}x)",
+            ratio,
+            1.0 + tolerance
+        );
 
         assert!(
             ratio < 1.0 + tolerance,
