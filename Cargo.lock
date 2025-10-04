@@ -1644,7 +1644,7 @@ dependencies = [
 
 [[package]]
 name = "saorsa-pqc"
-version = "0.3.13"
+version = "0.3.14"
 dependencies = [
  "aead",
  "aes-gcm",
@@ -1676,6 +1676,7 @@ dependencies = [
  "pprof",
  "proptest",
  "rand 0.8.5",
+ "rand_chacha 0.3.1",
  "rand_core 0.6.4",
  "rayon",
  "serde",

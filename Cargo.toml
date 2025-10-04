@@ -1,6 +1,6 @@
 [package]
 name = "saorsa-pqc"
-version = "0.3.13"
+version = "0.3.14"
 edition = "2021"
 authors = ["David Irvine <david@saorsalabs.com>"]
 license = "MIT OR Apache-2.0"
@@ -70,6 +70,7 @@ bincode = "2.0"
 
 # Random and hash
 rand = "0.8"
+rand_chacha = "0.3"  # FIPS-approved DRBG for FIPS 140-3 compliance
 sha2 = "0.10"
 sha3 = "0.10"
 blake3 = "1.8"
