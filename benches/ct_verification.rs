@@ -14,6 +14,8 @@
 use dudect_bencher::{ctbench_main, BenchRng, Class, CtRunner};
 use rand::RngCore;
 use saorsa_pqc::pqc::constant_time::{ct_array_eq, ct_copy_bytes, ct_eq, ct_select};
+use saorsa_pqc::pqc::ct_fips::{ct_buffer_eq, ct_conditional_zeroize, ct_ml_kem, ct_tag_verify};
+use subtle::Choice;
 
 /// Verify ct_eq is constant-time regardless of whether data matches
 ///
@@ -222,8 +224,259 @@ fn ct_eq_empty_slices(runner: &mut CtRunner, rng: &mut BenchRng) {
     });
 }
 
+// ============================================================================
+// Additional CT FIPS Wrapper Tests
+// ============================================================================
+
+/// Verify ct_tag_verify is constant-time for authentication tag comparison
+///
+/// Left: Matching authentication tags
+/// Right: Non-matching authentication tags (first byte differs)
+fn ct_tag_verify_matching_vs_mismatching(runner: &mut CtRunner, rng: &mut BenchRng) {
+    let tag_a = [0xAAu8; 16];
+    let tag_b_same = [0xAAu8; 16];
+    let mut tag_b_diff = [0xAAu8; 16];
+    tag_b_diff[0] = 0xBB;
+
+    let class = if rng.next_u32() % 2 == 0 {
+        Class::Left
+    } else {
+        Class::Right
+    };
+
+    runner.run_one(class, || {
+        let result = match class {
+            Class::Left => ct_tag_verify(&tag_a, &tag_b_same),
+            Class::Right => ct_tag_verify(&tag_a, &tag_b_diff),
+        };
+        std::hint::black_box(result)
+    });
+}
+
+/// Verify ct_buffer_eq is constant-time (32-byte keys)
+///
+/// Left: Compare identical 32-byte keys
+/// Right: Compare different 32-byte keys
+fn ct_buffer_eq_32byte_keys(runner: &mut CtRunner, rng: &mut BenchRng) {
+    let key_a = [0x42u8; 32];
+    let key_b_same = [0x42u8; 32];
+    let key_b_diff = [0x43u8; 32];
+
+    let class = if rng.next_u32() % 2 == 0 {
+        Class::Left
+    } else {
+        Class::Right
+    };
+
+    runner.run_one(class, || {
+        let result = match class {
+            Class::Left => ct_buffer_eq(&key_a, &key_b_same),
+            Class::Right => ct_buffer_eq(&key_a, &key_b_diff),
+        };
+        std::hint::black_box(result)
+    });
+}
+
+/// Verify ct_conditional_zeroize is constant-time
+///
+/// Left: Zeroize (choice=true)
+/// Right: Don't zeroize (choice=false)
+fn ct_conditional_zeroize_verification(runner: &mut CtRunner, rng: &mut BenchRng) {
+    let class = if rng.next_u32() % 2 == 0 {
+        Class::Left
+    } else {
+        Class::Right
+    };
+
+    runner.run_one(class, || {
+        let mut buffer = [0xAAu8; 64];
+        let choice = match class {
+            Class::Left => Choice::from(1u8),  // Zeroize
+            Class::Right => Choice::from(0u8), // Don't zeroize
+        };
+        ct_conditional_zeroize(&mut buffer, choice);
+        std::hint::black_box(buffer)
+    });
+}
+
+/// Verify ct_ml_kem::ct_validate_key_length is constant-time
+///
+/// Left: Correct length
+/// Right: Incorrect length
+fn ct_validate_key_length_verification(runner: &mut CtRunner, rng: &mut BenchRng) {
+    let key_correct = vec![0u8; 1184]; // ML-KEM-768 public key size
+    let key_incorrect = vec![0u8; 1000]; // Wrong size
+
+    let class = if rng.next_u32() % 2 == 0 {
+        Class::Left
+    } else {
+        Class::Right
+    };
+
+    runner.run_one(class, || {
+        let result = match class {
+            Class::Left => ct_ml_kem::ct_validate_key_length(&key_correct, 1184),
+            Class::Right => ct_ml_kem::ct_validate_key_length(&key_incorrect, 1184),
+        };
+        std::hint::black_box(result)
+    });
+}
+
+/// Verify ct_eq with 256-byte buffers (signature-sized data)
+///
+/// Left: Equal 256-byte buffers
+/// Right: Different 256-byte buffers
+fn ct_eq_signature_sized(runner: &mut CtRunner, rng: &mut BenchRng) {
+    let sig_a = [0x55u8; 256];
+    let sig_b_same = [0x55u8; 256];
+    let sig_b_diff = [0x66u8; 256];
+
+    let class = if rng.next_u32() % 2 == 0 {
+        Class::Left
+    } else {
+        Class::Right
+    };
+
+    runner.run_one(class, || {
+        let result = match class {
+            Class::Left => ct_eq(&sig_a, &sig_b_same),
+            Class::Right => ct_eq(&sig_a, &sig_b_diff),
+        };
+        std::hint::black_box(result)
+    });
+}
+
+/// Verify ct_eq with cryptographic key sizes (2400 bytes = ML-KEM-768 secret key)
+///
+/// Left: Equal large keys
+/// Right: Different large keys
+fn ct_eq_large_key_sized(runner: &mut CtRunner, rng: &mut BenchRng) {
+    let key_a = vec![0x77u8; 2400];
+    let key_b_same = vec![0x77u8; 2400];
+    let key_b_diff = vec![0x88u8; 2400];
+
+    let class = if rng.next_u32() % 2 == 0 {
+        Class::Left
+    } else {
+        Class::Right
+    };
+
+    runner.run_one(class, || {
+        let result = match class {
+            Class::Left => ct_eq(&key_a, &key_b_same),
+            Class::Right => ct_eq(&key_a, &key_b_diff),
+        };
+        std::hint::black_box(result)
+    });
+}
+
+/// Verify ct_eq handles single-bit differences consistently
+///
+/// Left: Difference in bit 0 of first byte
+/// Right: Difference in bit 7 of last byte
+fn ct_eq_single_bit_diff(runner: &mut CtRunner, rng: &mut BenchRng) {
+    let size = 512;
+    let reference = vec![0x00u8; size];
+
+    // Difference in bit 0 of first byte
+    let mut data_early_bit = vec![0x00u8; size];
+    data_early_bit[0] = 0x01;
+
+    // Difference in bit 7 of last byte
+    let mut data_late_bit = vec![0x00u8; size];
+    data_late_bit[size - 1] = 0x80;
+
+    let class = if rng.next_u32() % 2 == 0 {
+        Class::Left
+    } else {
+        Class::Right
+    };
+
+    runner.run_one(class, || {
+        let result = match class {
+            Class::Left => ct_eq(&reference, &data_early_bit),
+            Class::Right => ct_eq(&reference, &data_late_bit),
+        };
+        std::hint::black_box(result)
+    });
+}
+
+/// Verify ct_select with larger types (u64)
+///
+/// Left: Select first value
+/// Right: Select second value
+fn ct_select_u64_verification(runner: &mut CtRunner, rng: &mut BenchRng) {
+    let a = 0xDEAD_BEEF_CAFE_BABEu64;
+    let b = 0x1234_5678_9ABC_DEF0u64;
+
+    let class = if rng.next_u32() % 2 == 0 {
+        Class::Left
+    } else {
+        Class::Right
+    };
+
+    runner.run_one(class, || {
+        let result = match class {
+            Class::Left => ct_select(&a, &b, true),
+            Class::Right => ct_select(&a, &b, false),
+        };
+        std::hint::black_box(result)
+    });
+}
+
+/// Verify ct_array_eq with 64-byte arrays (SHA-512 hash size)
+///
+/// Left: Equal 64-byte arrays
+/// Right: Different 64-byte arrays
+fn ct_array_eq_64byte(runner: &mut CtRunner, rng: &mut BenchRng) {
+    let hash_a = [0x99u8; 64];
+    let hash_b_same = [0x99u8; 64];
+    let hash_b_diff = [0xAAu8; 64];
+
+    let class = if rng.next_u32() % 2 == 0 {
+        Class::Left
+    } else {
+        Class::Right
+    };
+
+    runner.run_one(class, || {
+        let result = match class {
+            Class::Left => ct_array_eq(&hash_a, &hash_b_same),
+            Class::Right => ct_array_eq(&hash_a, &hash_b_diff),
+        };
+        std::hint::black_box(result)
+    });
+}
+
+/// Verify CtSharedSecret comparison is constant-time
+///
+/// Left: Equal shared secrets
+/// Right: Different shared secrets
+fn ct_shared_secret_eq(runner: &mut CtRunner, rng: &mut BenchRng) {
+    use subtle::ConstantTimeEq;
+
+    let ss_a = ct_ml_kem::CtSharedSecret::from_bytes([0xCCu8; 32]);
+    let ss_b_same = ct_ml_kem::CtSharedSecret::from_bytes([0xCCu8; 32]);
+    let ss_b_diff = ct_ml_kem::CtSharedSecret::from_bytes([0xDDu8; 32]);
+
+    let class = if rng.next_u32() % 2 == 0 {
+        Class::Left
+    } else {
+        Class::Right
+    };
+
+    runner.run_one(class, || {
+        let result = match class {
+            Class::Left => ss_a.ct_eq(&ss_b_same),
+            Class::Right => ss_a.ct_eq(&ss_b_diff),
+        };
+        std::hint::black_box(result)
+    });
+}
+
 // Register all benchmarks with the dudect framework
 ctbench_main!(
+    // Original constant_time module tests
     ct_eq_equal_vs_different,
     ct_eq_early_vs_late_diff,
     ct_array_eq_verification,
@@ -231,5 +484,17 @@ ctbench_main!(
     ct_copy_bytes_length_verification,
     ct_select_verification,
     ct_eq_random_data,
-    ct_eq_empty_slices
+    ct_eq_empty_slices,
+    // New CT FIPS wrapper tests
+    ct_tag_verify_matching_vs_mismatching,
+    ct_buffer_eq_32byte_keys,
+    ct_conditional_zeroize_verification,
+    ct_validate_key_length_verification,
+    // Extended cryptographic data size tests
+    ct_eq_signature_sized,
+    ct_eq_large_key_sized,
+    ct_eq_single_bit_diff,
+    ct_select_u64_verification,
+    ct_array_eq_64byte,
+    ct_shared_secret_eq
 );

@@ -326,6 +326,7 @@ impl DrbgState {
 ///
 /// ```rust,no_run
 /// use saorsa_pqc::pqc::fips_rng::{FipsRng, SecurityStrength};
+/// use rand_core::RngCore;
 ///
 /// # fn main() -> Result<(), Box<dyn std::error::Error>> {
 /// // Create a FIPS-compliant RNG for 256-bit security

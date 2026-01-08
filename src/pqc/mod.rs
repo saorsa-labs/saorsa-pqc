@@ -96,6 +96,7 @@ pub mod traits;
 
 // Security-critical modules
 pub mod constant_time;
+pub mod ct_fips;
 pub mod fips_rng;
 
 // Hybrid cryptography
@@ -147,6 +148,9 @@ pub use traits::{blake3_helpers, ConstantTimeCompare, Kem, SecureBuffer, Sig};
 
 // Re-export FIPS RNG
 pub use fips_rng::{FipsRng, FipsRngError, SecurityStrength};
+
+// Re-export CT FIPS wrappers
+pub use ct_fips::{ct_ml_dsa, ct_ml_kem, ct_slh_dsa, CtResult};
 
 // TLS extensions are not part of core PQC - use saorsa-pqc-tls crate if needed
 

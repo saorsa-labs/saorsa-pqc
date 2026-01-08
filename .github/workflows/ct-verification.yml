@@ -14,6 +14,9 @@ env:
   CARGO_TERM_COLOR: always
   RUST_BACKTRACE: 1
   RUSTFLAGS: "-D warnings"
+  # Constant-time verification threshold (3-sigma = 99.7% confidence)
+  # Lower values = stricter verification
+  CT_THRESHOLD: "3.0"
 
 jobs:
   ct-verification:
@@ -62,6 +65,7 @@ jobs:
         mkdir -p ct_results
 
         # Run each benchmark for 30 seconds and capture results
+        # Core constant-time primitives (quick check on every PR)
         BENCHMARKS=(
           "ct_eq_equal_vs_different"
           "ct_eq_early_vs_late_diff"
@@ -69,6 +73,10 @@ jobs:
           "ct_copy_bytes_choice_verification"
           "ct_copy_bytes_length_verification"
           "ct_select_verification"
+          "ct_tag_verify_matching_vs_mismatching"
+          "ct_buffer_eq_32byte_keys"
+          "ct_conditional_zeroize_verification"
+          "ct_validate_key_length_verification"
         )
 
         FAILED=0
@@ -94,14 +102,17 @@ jobs:
 
             echo "max_t = $MAX_T (absolute: $ABS_MAX_T)"
 
-            # Check if max_t exceeds threshold (5.0 indicates non-constant-time)
+            # Check if max_t exceeds threshold
+            # Threshold from env var (default 3.0 = 99.7% confidence / 3-sigma)
+            # Values > 5.0 strongly indicate non-constant-time implementation
+            THRESHOLD="${CT_THRESHOLD:-3.0}"
             if [ -n "$ABS_MAX_T" ]; then
-              EXCEEDS=$(echo "$ABS_MAX_T > 4.5" | bc -l 2>/dev/null || echo "0")
+              EXCEEDS=$(echo "$ABS_MAX_T > $THRESHOLD" | bc -l 2>/dev/null || echo "0")
               if [ "$EXCEEDS" = "1" ]; then
-                echo "⚠️ WARNING: $bench shows potential timing leak (|t| = $ABS_MAX_T > 4.5)"
+                echo "⚠️ WARNING: $bench shows potential timing leak (|t| = $ABS_MAX_T > $THRESHOLD)"
                 FAILED=1
               else
-                echo "✅ PASS: $bench is constant-time (|t| = $ABS_MAX_T < 4.5)"
+                echo "✅ PASS: $bench is constant-time (|t| = $ABS_MAX_T < $THRESHOLD)"
               fi
             else
               echo "⚠️ Could not parse max_t value"
@@ -162,7 +173,9 @@ jobs:
         CT_BINARY=$(ls ./target/release/deps/ct_verification-* 2>/dev/null | head -1)
         mkdir -p ct_results_extended
 
+        # All benchmarks including extended cryptographic scenarios
         BENCHMARKS=(
+          # Core constant-time primitives
           "ct_eq_equal_vs_different"
           "ct_eq_early_vs_late_diff"
           "ct_array_eq_verification"
@@ -171,6 +184,18 @@ jobs:
           "ct_select_verification"
           "ct_eq_random_data"
           "ct_eq_empty_slices"
+          # CT FIPS wrapper tests
+          "ct_tag_verify_matching_vs_mismatching"
+          "ct_buffer_eq_32byte_keys"
+          "ct_conditional_zeroize_verification"
+          "ct_validate_key_length_verification"
+          # Extended cryptographic data size tests
+          "ct_eq_signature_sized"
+          "ct_eq_large_key_sized"
+          "ct_eq_single_bit_diff"
+          "ct_select_u64_verification"
+          "ct_array_eq_64byte"
+          "ct_shared_secret_eq"
         )
 
         for bench in "${BENCHMARKS[@]}"; do
@@ -186,6 +211,7 @@ jobs:
 
         echo ""
         echo "Extended analysis complete. Results saved to ct_results_extended/"
+        echo "Total benchmarks tested: ${#BENCHMARKS[@]}"
 
     - name: Upload extended CT results
       uses: actions/upload-artifact@v4
@@ -193,3 +219,194 @@ jobs:
         name: ct-verification-extended-results
         path: ct_results_extended/
         retention-days: 90
+
+  ct-arm64:
+    name: ARM64 CT Verification
+    runs-on: ubuntu-24.04-arm
+    timeout-minutes: 45
+    # Only run on schedule or manual trigger (ARM runners are limited)
+    if: github.event_name == 'schedule' || github.event_name == 'workflow_dispatch'
+
+    steps:
+    - name: Checkout code
+      uses: actions/checkout@v4
+
+    - name: Install Rust
+      uses: dtolnay/rust-toolchain@stable
+
+    - name: Cache cargo registry
+      uses: actions/cache@v4
+      with:
+        path: |
+          ~/.cargo/registry
+          ~/.cargo/git
+          target
+        key: ${{ runner.os }}-${{ runner.arch }}-cargo-ct-${{ hashFiles('**/Cargo.lock') }}
+        restore-keys: |
+          ${{ runner.os }}-${{ runner.arch }}-cargo-ct-
+
+    - name: Build CT verification benchmarks
+      run: cargo build --release --bench ct_verification
+
+    - name: Run ARM64 constant-time verification
+      run: |
+        echo "Running ARM64 DudeCT verification..."
+        echo "Architecture: $(uname -m)"
+
+        CT_BINARY=$(ls ./target/release/deps/ct_verification-* 2>/dev/null | head -1)
+        mkdir -p ct_results_arm64
+
+        # Core benchmarks for ARM64 verification
+        BENCHMARKS=(
+          "ct_eq_equal_vs_different"
+          "ct_eq_early_vs_late_diff"
+          "ct_array_eq_verification"
+          "ct_copy_bytes_choice_verification"
+          "ct_select_verification"
+          "ct_tag_verify_matching_vs_mismatching"
+        )
+
+        THRESHOLD="${CT_THRESHOLD:-3.0}"
+        FAILED=0
+
+        for bench in "${BENCHMARKS[@]}"; do
+          echo ""
+          echo "=== ARM64 Testing: $bench ==="
+
+          timeout 60s $CT_BINARY --continuous "$bench" > "ct_results_arm64/${bench}.log" 2>&1 || true
+
+          if [ -f "ct_results_arm64/${bench}.log" ]; then
+            LAST_LINE=$(grep "max t =" "ct_results_arm64/${bench}.log" | tail -1)
+            echo "Last measurement: $LAST_LINE"
+
+            MAX_T=$(echo "$LAST_LINE" | grep -oP 'max t = [+-]?\d+\.?\d*' | grep -oP '[+-]?\d+\.?\d*$' || echo "0")
+            ABS_MAX_T=$(echo "$MAX_T" | tr -d '-' | tr -d '+')
+
+            if [ -n "$ABS_MAX_T" ]; then
+              EXCEEDS=$(echo "$ABS_MAX_T > $THRESHOLD" | bc -l 2>/dev/null || echo "0")
+              if [ "$EXCEEDS" = "1" ]; then
+                echo "⚠️ ARM64 WARNING: $bench timing issue (|t| = $ABS_MAX_T > $THRESHOLD)"
+                FAILED=1
+              else
+                echo "✅ ARM64 PASS: $bench constant-time (|t| = $ABS_MAX_T < $THRESHOLD)"
+              fi
+            fi
+          fi
+        done
+
+        echo ""
+        echo "=== ARM64 Summary ==="
+        if [ "$FAILED" = "1" ]; then
+          echo "❌ Some ARM64 tests showed potential timing variance"
+          echo "   Note: ARM64 may have different timing characteristics than x86_64"
+          # Don't fail the job - ARM64 results are informational
+        else
+          echo "✅ All ARM64 constant-time tests passed"
+        fi
+
+    - name: Upload ARM64 CT results
+      uses: actions/upload-artifact@v4
+      with:
+        name: ct-verification-arm64-results
+        path: ct_results_arm64/
+        retention-days: 30
+
+  ct-chaos:
+    name: Chaos CT Verification (CPU Stress)
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    # Only run on schedule or manual trigger
+    if: github.event_name == 'schedule' || github.event_name == 'workflow_dispatch'
+
+    steps:
+    - name: Checkout code
+      uses: actions/checkout@v4
+
+    - name: Install Rust
+      uses: dtolnay/rust-toolchain@stable
+
+    - name: Install stress tools
+      run: sudo apt-get update && sudo apt-get install -y stress-ng
+
+    - name: Cache cargo registry
+      uses: actions/cache@v4
+      with:
+        path: |
+          ~/.cargo/registry
+          ~/.cargo/git
+          target
+        key: ${{ runner.os }}-cargo-ct-chaos-${{ hashFiles('**/Cargo.lock') }}
+
+    - name: Build CT verification benchmarks
+      run: cargo build --release --bench ct_verification
+
+    - name: Run chaos constant-time verification
+      run: |
+        echo "Running chaos CT verification under CPU stress..."
+        echo "This tests that constant-time properties hold even under adverse conditions."
+
+        CT_BINARY=$(ls ./target/release/deps/ct_verification-* 2>/dev/null | head -1)
+        mkdir -p ct_results_chaos
+
+        # Core benchmarks to test under stress
+        BENCHMARKS=(
+          "ct_eq_equal_vs_different"
+          "ct_copy_bytes_choice_verification"
+          "ct_select_verification"
+          "ct_tag_verify_matching_vs_mismatching"
+        )
+
+        # Use a slightly higher threshold for chaos tests (noise from stress)
+        THRESHOLD="${CT_THRESHOLD_CHAOS:-4.0}"
+        FAILED=0
+
+        echo "=== Starting CPU stress (4 workers, 50% CPU) ==="
+        # Start CPU stress in background
+        stress-ng --cpu 4 --cpu-load 50 --timeout 0 &
+        STRESS_PID=$!
+        sleep 2
+
+        for bench in "${BENCHMARKS[@]}"; do
+          echo ""
+          echo "=== Chaos Testing: $bench (under CPU stress) ==="
+
+          timeout 45s $CT_BINARY --continuous "$bench" > "ct_results_chaos/${bench}.log" 2>&1 || true
+
+          if [ -f "ct_results_chaos/${bench}.log" ]; then
+            LAST_LINE=$(grep "max t =" "ct_results_chaos/${bench}.log" | tail -1)
+            echo "Last measurement: $LAST_LINE"
+
+            MAX_T=$(echo "$LAST_LINE" | grep -oP 'max t = [+-]?\d+\.?\d*' | grep -oP '[+-]?\d+\.?\d*$' || echo "0")
+            ABS_MAX_T=$(echo "$MAX_T" | tr -d '-' | tr -d '+')
+
+            if [ -n "$ABS_MAX_T" ]; then
+              EXCEEDS=$(echo "$ABS_MAX_T > $THRESHOLD" | bc -l 2>/dev/null || echo "0")
+              if [ "$EXCEEDS" = "1" ]; then
+                echo "⚠️ CHAOS WARNING: $bench timing variance under stress (|t| = $ABS_MAX_T > $THRESHOLD)"
+                FAILED=1
+              else
+                echo "✅ CHAOS PASS: $bench constant-time under stress (|t| = $ABS_MAX_T < $THRESHOLD)"
+              fi
+            fi
+          fi
+        done
+
+        # Stop stress
+        kill $STRESS_PID 2>/dev/null || true
+
+        echo ""
+        echo "=== Chaos Summary ==="
+        if [ "$FAILED" = "1" ]; then
+          echo "❌ Some tests showed timing variance under CPU stress"
+          echo "   This may indicate sensitivity to CPU scheduling"
+          # Don't fail - chaos results are informational
+        else
+          echo "✅ All constant-time tests passed under CPU stress"
+        fi
+
+    - name: Upload chaos CT results
+      uses: actions/upload-artifact@v4
+      with:
+        name: ct-verification-chaos-results
+        path: ct_results_chaos/
+        retention-days: 30
