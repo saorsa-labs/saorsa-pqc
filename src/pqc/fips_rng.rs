@@ -450,6 +450,12 @@ impl RngCore for FipsRng {
         u64::from_le_bytes(bytes)
     }
 
+    // RngCore::fill_bytes cannot return errors per the trait definition.
+    // We must use expect() for unrecoverable failures:
+    // - Mutex poisoning: indicates panic in another thread (unrecoverable)
+    // - Reseed failure: entropy source exhausted (unrecoverable for FIPS RNG)
+    // - Generate failure: internal DRBG error (unrecoverable)
+    #[allow(clippy::expect_used)]
     fn fill_bytes(&mut self, dest: &mut [u8]) {
         // Handle large requests by chunking
         const CHUNK_SIZE: usize = 65536; // 64KB max per FIPS requirement
@@ -459,18 +465,24 @@ impl RngCore for FipsRng {
             let chunk_size = (dest.len() - offset).min(CHUNK_SIZE);
             let chunk = &mut dest[offset..offset + chunk_size];
 
-            // Try to generate, reseed if needed
-            let mut state = self.drbg_state.lock().expect("Lock should not be poisoned");
+            let mut state = self
+                .drbg_state
+                .lock()
+                .expect("DRBG mutex poisoned - unrecoverable state");
 
             if state.needs_reseed() {
                 drop(state); // Release lock before reseeding
-                self.reseed().expect("Reseed should not fail");
-                state = self.drbg_state.lock().expect("Lock should not be poisoned");
+                self.reseed()
+                    .expect("FIPS RNG reseed failed - entropy source exhausted");
+                state = self
+                    .drbg_state
+                    .lock()
+                    .expect("DRBG mutex poisoned - unrecoverable state");
             }
 
             state
                 .generate(chunk)
-                .expect("Generation should not fail after reseed check");
+                .expect("FIPS RNG generation failed after reseed check");
 
             offset += chunk_size;
         }
@@ -485,11 +497,13 @@ impl RngCore for FipsRng {
 impl CryptoRng for FipsRng {}
 
 impl Clone for FipsRng {
+    // Clone creates a new independent RNG instance with fresh entropy.
+    // If the original was created successfully, clone should also succeed
+    // unless the system entropy source has become unavailable (unrecoverable).
+    #[allow(clippy::expect_used)]
     fn clone(&self) -> Self {
-        // Create a new independent RNG instance
-        // This is safe because each clone gets its own entropy
         Self::new(self.entropy_source.security_strength)
-            .expect("Clone should succeed if original succeeded")
+            .expect("Clone failed - entropy source unavailable")
     }
 }
 
