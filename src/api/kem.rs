@@ -1,3 +1,7 @@
+// Rust 1.92+ raises unused_assignments on struct fields read via getter methods
+// when used with derive macros like Zeroize. This is a known false positive.
+#![allow(unused_assignments)]
+
 //! ML-KEM (Module-Lattice-Based Key Encapsulation Mechanism) API
 //!
 //! Provides a simple interface to FIPS 203 ML-KEM without requiring

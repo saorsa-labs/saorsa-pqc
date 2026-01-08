@@ -1,3 +1,7 @@
+// Rust 1.92+ raises unused_assignments on struct fields read via getter methods
+// when used with derive macros like Zeroize. This is a known false positive.
+#![allow(unused_assignments)]
+
 //! Quantum-Secure Symmetric Encryption
 //!
 //! This module provides ChaCha20-Poly1305 authenticated encryption, which is

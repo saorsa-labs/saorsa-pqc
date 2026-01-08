@@ -1,3 +1,7 @@
+// Rust 1.92+ raises unused_assignments on struct fields read via getter methods
+// when used with derive macros like Zeroize. This is a known false positive.
+#![allow(unused_assignments)]
+
 //! SLH-DSA (Stateless Hash-Based Digital Signature Algorithm) API - FIPS 205
 //!
 //! This module provides a high-level interface to the FIPS 205 SLH-DSA (Stateless

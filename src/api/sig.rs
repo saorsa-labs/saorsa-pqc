@@ -1,3 +1,7 @@
+// Rust 1.92+ raises unused_assignments on struct fields read via getter methods
+// when used with derive macros like Zeroize. This is a known false positive.
+#![allow(unused_assignments)]
+
 //! ML-DSA (Module-Lattice-Based Digital Signature Algorithm) API
 //!
 //! Provides a simple interface to FIPS 204 ML-DSA for quantum-resistant digital signatures
