@@ -335,11 +335,19 @@ mod tests {
         // Mismatched lengths should return false but still take constant time
         let result1 = ct_copy_bytes(&mut dest, &src_short, true);
         assert!(!result1, "Mismatched length should return false");
-        assert_eq!(dest, [0, 0, 0, 0], "Dest should be unchanged on length mismatch");
+        assert_eq!(
+            dest,
+            [0, 0, 0, 0],
+            "Dest should be unchanged on length mismatch"
+        );
 
         let result2 = ct_copy_bytes(&mut dest, &src_long, true);
         assert!(!result2, "Mismatched length should return false");
-        assert_eq!(dest, [0, 0, 0, 0], "Dest should be unchanged on length mismatch");
+        assert_eq!(
+            dest,
+            [0, 0, 0, 0],
+            "Dest should be unchanged on length mismatch"
+        );
     }
 
     #[test]

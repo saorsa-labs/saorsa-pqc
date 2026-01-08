@@ -157,14 +157,24 @@ fn test_constant_time_copy() {
 
     // Copy with false condition (no-op but still succeeds because lengths match)
     let success2 = ct_copy_bytes(&mut dest2, &src, false);
-    assert!(success2, "Copy with matching lengths should succeed even with choice=false");
+    assert!(
+        success2,
+        "Copy with matching lengths should succeed even with choice=false"
+    );
     assert_eq!(dest2, [0, 0, 0, 0]);
 
     // Test mismatched lengths - should return false in constant time
     let mut dest3 = [0u8; 3]; // Different length
     let success3 = ct_copy_bytes(&mut dest3, &src, true);
-    assert!(!success3, "Copy with mismatched lengths should return false");
-    assert_eq!(dest3, [0, 0, 0], "Dest should be unchanged on length mismatch");
+    assert!(
+        !success3,
+        "Copy with mismatched lengths should return false"
+    );
+    assert_eq!(
+        dest3,
+        [0, 0, 0],
+        "Dest should be unchanged on length mismatch"
+    );
 
     println!("✅ Constant-time copy test passed");
 }

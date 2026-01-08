@@ -41,7 +41,7 @@ fn ct_eq_equal_vs_different(runner: &mut CtRunner, rng: &mut BenchRng) {
     // Run the operation
     runner.run_one(class, || {
         let result = match class {
-            Class::Left => ct_eq(&data_a, &data_b_same),   // Equal comparison
+            Class::Left => ct_eq(&data_a, &data_b_same), // Equal comparison
             Class::Right => ct_eq(&data_a, &data_b_diff), // Unequal comparison
         };
         std::hint::black_box(result)
@@ -217,7 +217,7 @@ fn ct_eq_empty_slices(runner: &mut CtRunner, rng: &mut BenchRng) {
 
     runner.run_one(class, || {
         let result = match class {
-            Class::Left => ct_eq(empty, empty),          // Empty vs empty
+            Class::Left => ct_eq(empty, empty),            // Empty vs empty
             Class::Right => ct_eq(empty, &non_empty[..0]), // Empty vs empty slice
         };
         std::hint::black_box(result)
