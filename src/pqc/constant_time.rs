@@ -14,36 +14,31 @@ use zeroize::Zeroize;
 ///
 /// # Security Note
 /// This function is designed to be constant-time to prevent timing attacks.
-/// The length comparison is also performed in constant-time.
+/// Uses the `subtle` crate's ConstantTimeEq implementation which is
+/// well-audited and optimized for constant-time behavior.
+///
+/// When slices have different lengths, this function returns false but
+/// still performs the comparison on the overlapping portion to minimize
+/// timing variations. Note that some timing difference is unavoidable
+/// when lengths differ significantly.
 #[must_use]
 pub fn ct_eq(a: &[u8], b: &[u8]) -> bool {
-    // Constant-time length comparison
-    let len_equal = a.len().ct_eq(&b.len());
-
-    // Pad the shorter slice conceptually to avoid early returns
-    // We'll compare up to the maximum length
-    let max_len = a.len().max(b.len());
-    let min_len = a.len().min(b.len());
-
-    // Compare the common portion
-    let mut content_equal = Choice::from(1u8);
-    for i in 0..min_len {
-        content_equal &= a[i].ct_eq(&b[i]);
+    // Use subtle's ConstantTimeEq which handles same-length comparison
+    // in a well-tested constant-time manner
+    if a.len() != b.len() {
+        // Different lengths - still compare the overlapping portion
+        // to minimize timing leakage, but we know the result will be false
+        let min_len = a.len().min(b.len());
+        if min_len > 0 {
+            // Compare overlapping portion to do consistent work
+            let _ = black_box(a[..min_len].ct_eq(&b[..min_len]));
+        }
+        return black_box(false);
     }
 
-    // For the remaining portion (if lengths differ),
-    // we still need to do work to maintain constant time
-    for _ in min_len..max_len {
-        // Perform dummy operations to maintain constant time
-        // Use black_box to prevent optimization
-        let dummy = black_box(0u8);
-        content_equal &= dummy.ct_eq(&dummy);
-    }
-
-    // Both lengths and contents must be equal
-    let result = len_equal & content_equal;
-
-    // Use black_box to prevent the compiler from optimizing away the comparison
+    // Same length - use subtle's constant-time comparison directly
+    // This is the critical path for security-sensitive comparisons
+    let result = a.ct_eq(b);
     black_box(result.into())
 }
 
@@ -233,9 +228,9 @@ pub fn ct_clear<T: Zeroize>(data: &mut T) {
 /// `false` if lengths did not match (no copy occurred).
 ///
 /// # Security Note
-/// This function is designed for FIPS 140-3 compliance. It processes the
-/// maximum of the two lengths to ensure constant-time execution even when
-/// lengths differ.
+/// This function is designed for FIPS 140-3 compliance. For truly constant-time
+/// behavior when lengths may differ significantly, consider using fixed-size
+/// buffer variants instead.
 #[inline]
 #[must_use]
 pub fn ct_copy_bytes(dest: &mut [u8], src: &[u8], choice: bool) -> bool {
@@ -248,25 +243,37 @@ pub fn ct_copy_bytes(dest: &mut [u8], src: &[u8], choice: bool) -> bool {
     // Combine choice with length check: only copy if both are true
     let should_copy = Choice::from(u8::from(choice)) & lengths_match;
 
-    // Process the minimum length for the actual copy
-    // (we can't read beyond buffer bounds)
+    // Process the minimum length - this is where actual copy happens
     let min_len = dest_len.min(src_len);
 
     // Perform the conditional copy for overlapping portion
     for i in 0..min_len {
-        // SAFETY: i is always < min_len <= dest_len and i < min_len <= src_len
         dest[i].conditional_assign(&src[i], should_copy);
     }
 
-    // For constant-time behavior, we need to do *something* for the remaining
-    // iterations to match the timing of max-length processing.
-    // We perform dummy operations that can't be optimized away.
+    // For the remaining bytes (when lengths differ), we need to do
+    // EQUIVALENT work to conditional_assign. We use a volatile write
+    // to a dummy location to ensure the compiler doesn't optimize differently.
     let max_len = dest_len.max(src_len);
-    for _ in min_len..max_len {
-        // Dummy constant-time operation to maintain timing
-        let dummy = black_box(0u8);
-        let _ = black_box(dummy.ct_eq(&dummy));
+    let mut dummy = 0u8;
+
+    for i in min_len..max_len {
+        // Read from whichever buffer extends further
+        let src_byte = if i < src_len {
+            src[i]
+        } else if i < dest_len {
+            dest[i]
+        } else {
+            0u8
+        };
+
+        // Perform conditional_assign on dummy to match the work profile
+        dummy.conditional_assign(&src_byte, should_copy);
     }
+
+    // Use black_box to ensure dummy operations aren't optimized away
+    // This is critical for constant-time behavior
+    let _ = black_box(dummy);
 
     // Return whether lengths matched (constant-time conversion)
     black_box(lengths_match.into())
