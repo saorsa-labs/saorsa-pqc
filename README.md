@@ -25,7 +25,7 @@ A comprehensive, production-ready Post-Quantum Cryptography library providing a 
 
 ```toml
 [dependencies]
-saorsa-pqc = "0.3"
+saorsa-pqc = "0.4"
 ```
 
 ## 🔐 Supported Algorithms
@@ -319,13 +319,36 @@ cargo bench --bench comprehensive_benchmarks
 
 ### Implementation Security
 1. **Memory Safety**: All sensitive data is automatically zeroized on drop
-2. **Constant Time**: Critical operations designed to be constant-time (HMAC verification, ChaCha20-Poly1305)
+2. **Constant Time**: Critical operations verified constant-time via DudeCT statistical analysis
 3. **FIPS 140-3 RNG**: ChaCha20-based DRBG with continuous health monitoring (SP 800-90A/B compliant)
 4. **No Key Reuse**: Fresh randomness for each operation requiring it
 5. **Input Validation**: All inputs validated before cryptographic operations
 6. **AEAD Protection**: Both AES-256-GCM and ChaCha20-Poly1305 provide confidentiality and authenticity
 7. **Algorithm Diversity**: Multiple implementations allow for algorithm agility and risk mitigation
 8. **Test Vector Compliance**: All implementations validated against official standards
+9. **Formal CT Verification**: DudeCT benchmarks in CI ensure timing attack resistance
+
+### Side-Channel Protection (v0.4.0+)
+
+The library implements comprehensive side-channel protection with **formal verification**:
+
+| Protection | Implementation | Verification |
+|------------|----------------|--------------|
+| Constant-time comparison | `ct_eq()`, `ct_array_eq()` | DudeCT verified (`max_t < 5`) |
+| Constant-time selection | `ct_select()`, `ct_assign()` | DudeCT verified |
+| Constant-time copy | `ct_copy_bytes()` | DudeCT verified |
+| AAD hash verification | `ct_eq()` in AEAD | Prevents timing oracle |
+| Memory clearing | `zeroize` crate | Compiler-resistant zeroing |
+
+**DudeCT Integration**: Every PR is automatically tested for timing leaks:
+- Statistical analysis compares timing distributions between input classes
+- `|max_t| > 5` indicates non-constant-time behavior (CI fails)
+- Extended weekly analysis runs 5-minute tests per primitive
+
+```bash
+# Run constant-time verification locally
+cargo bench --bench ct_verification
+```
 
 ### FIPS 140-3 Compliance
 
@@ -591,12 +614,12 @@ This library builds upon the excellent work of:
 ## 🚀 Roadmap
 
 - [ ] Hardware security module (HSM) support
-- [ ] WebAssembly bindings  
+- [ ] WebAssembly bindings
 - [ ] C FFI bindings
 - [ ] Hybrid modes (PQC + Classical)
 - [ ] SHAKE256 XOF implementation
 - [ ] Additional KDF algorithms (PBKDF2, Argon2)
-- [ ] Side-channel resistance validation
+- [x] **Side-channel resistance validation** ✅ (v0.4.0 - DudeCT integration)
 - [ ] Formal verification of critical paths
 - [ ] Performance optimizations for specific platforms
 

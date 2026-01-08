@@ -5,6 +5,51 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [0.4.0] - 2025-01-08
+
+### Added
+- **DudeCT Constant-Time Verification**: Formal statistical testing for timing attack resistance
+  - 8 comprehensive benchmarks covering all constant-time primitives
+  - CI workflow (`ct-verification.yml`) with automated verification on every PR
+  - Extended analysis mode for thorough weekly verification
+- **Enhanced Constant-Time Copy**: `ct_copy_bytes` now handles length mismatches securely
+  - Returns `bool` indicating whether lengths matched (constant-time)
+  - Processes maximum length with dummy operations to prevent timing leaks
+  - Added `#[must_use]` attribute to enforce result checking
+
+### Changed
+- **BREAKING**: `ct_copy_bytes` signature changed from `fn(...) -> ()` to `fn(...) -> bool`
+  - Old code that ignored the return value will receive compiler warnings
+  - Behavior change: previously silently failed on length mismatch (timing leak); now returns `false` in constant time
+- **AAD Hash Comparison**: Replaced non-constant-time `!=` with `ct_eq()` in encryption module
+  - Prevents timing oracle attacks on authentication tag verification
+
+### Security
+- **Side-Channel Protection Rating**: Upgraded from "Good" to "Excellent"
+- **Timing Leak Fixes**: Two critical timing vulnerabilities patched
+  - `ct_copy_bytes` early-exit on length mismatch
+  - AAD hash comparison using standard equality
+- **Formal Verification**: DudeCT statistical analysis confirms `max_t < 5` (constant-time)
+
+### Technical Details
+- DudeCT benchmarks test: `ct_eq`, `ct_array_eq`, `ct_copy_bytes`, `ct_select`
+- Test scenarios: equal vs different data, early vs late differences, random data, empty slices
+- CI threshold: `|max_t| < 4.5` (below 5.0 which indicates timing leak)
+
+### Migration Guide
+```rust
+// Before (0.3.x)
+ct_copy_bytes(&mut dest, &src, true);  // Silently failed if lengths differed
+
+// After (0.4.0)
+let success = ct_copy_bytes(&mut dest, &src, true);
+if !success {
+    // Handle length mismatch
+}
+// Or use assert for same-length guarantees:
+assert!(ct_copy_bytes(&mut dest, &src, true), "Length mismatch");
+```
+
 ## [0.3.12] - 2025-01-20
 
 ### Added

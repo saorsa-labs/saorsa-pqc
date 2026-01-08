@@ -1,6 +1,6 @@
 [package]
 name = "saorsa-pqc"
-version = "0.3.14"
+version = "0.4.0"
 edition = "2021"
 authors = ["David Irvine <david@saorsalabs.com>"]
 license = "MIT OR Apache-2.0"
@@ -109,6 +109,9 @@ proptest = "1.4"
 hex = "0.4"
 once_cell = "1.19"
 
+# Constant-time verification (DudeCT statistical testing)
+dudect-bencher = "0.6"
+
 # Additional test dependencies for comprehensive testing
 serde_json = "1.0"
 lazy_static = "1.4"
@@ -161,6 +164,11 @@ required-features = ["benchmarks"]
 [[bench]]
 name = "comprehensive_benchmarks"
 path = "benches/comprehensive_benchmarks.rs"
+harness = false
+
+[[bench]]
+name = "ct_verification"
+path = "benches/ct_verification.rs"
 harness = false
 
 [profile.release]

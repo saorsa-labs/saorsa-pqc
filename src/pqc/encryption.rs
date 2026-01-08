@@ -23,6 +23,7 @@
 //! - HKDF-SHA256 for proper key derivation (NIST SP 800-56C Rev. 2)
 //! - Constant-time operations where possible
 
+use crate::pqc::constant_time::ct_eq;
 use crate::pqc::types::{
     MlKemCiphertext, MlKemPublicKey, MlKemSecretKey, PqcError, PqcResult, SharedSecret,
 };
@@ -160,7 +161,7 @@ impl HybridPublicKeyEncryption {
         hasher.update(associated_data);
         let computed_hash: [u8; 32] = hasher.finalize().into();
 
-        if computed_hash != encrypted_message.aad_hash {
+        if !ct_eq(&computed_hash, &encrypted_message.aad_hash) {
             return Err(PqcError::DecryptionFailed(
                 "Associated data verification failed".to_string(),
             ));
