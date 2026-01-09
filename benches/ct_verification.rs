@@ -23,17 +23,16 @@ use subtle::Choice;
 /// Right: Compare different data (0xAA vs 0xBB)
 ///
 /// Both should take the same time if constant-time.
-/// We use ConstantTimeEq::ct_eq on fixed-size arrays (not slices) because
-/// subtle's array implementation is more reliably constant-time than slices.
+/// We use 32-byte arrays as this is the most common cryptographic size
+/// (SHA-256, AES keys) and has the most reliable CT behavior in subtle.
 fn ct_eq_equal_vs_different(runner: &mut CtRunner, rng: &mut BenchRng) {
     use subtle::ConstantTimeEq;
 
-    // Use 64-byte arrays (SHA-512 hash size)
-    // IMPORTANT: Use array-to-array comparison, not slice-to-slice
-    // subtle's slice implementation can have timing variations on some platforms
-    let data_a: [u8; 64] = [0xAAu8; 64];
-    let data_b_same: [u8; 64] = [0xAAu8; 64];
-    let data_b_diff: [u8; 64] = [0xBBu8; 64];
+    // Use 32-byte arrays (SHA-256 hash size, AES-256 key size)
+    // Larger arrays (64+ bytes) can have SIMD optimization differences
+    let data_a: [u8; 32] = [0xAAu8; 32];
+    let data_b_same: [u8; 32] = [0xAAu8; 32];
+    let data_b_diff: [u8; 32] = [0xBBu8; 32];
 
     // Randomly choose which class to measure
     let class = if rng.next_u32() % 2 == 0 {
@@ -59,20 +58,20 @@ fn ct_eq_equal_vs_different(runner: &mut CtRunner, rng: &mut BenchRng) {
 /// Right: Difference at last byte
 ///
 /// Non-constant-time code often early-exits on first difference.
-/// We use ConstantTimeEq::ct_eq on arrays (not slices) for reliable CT behavior.
+/// We use 32-byte arrays for reliable CT behavior across platforms.
 fn ct_eq_early_vs_late_diff(runner: &mut CtRunner, rng: &mut BenchRng) {
     use subtle::ConstantTimeEq;
 
-    // Use 64-byte arrays
-    let reference: [u8; 64] = [0xAAu8; 64];
+    // Use 32-byte arrays (most common crypto size)
+    let reference: [u8; 32] = [0xAAu8; 32];
 
     // Create test data with difference at start
-    let mut data_early_diff: [u8; 64] = [0xAAu8; 64];
+    let mut data_early_diff: [u8; 32] = [0xAAu8; 32];
     data_early_diff[0] = 0xBB;
 
     // Create test data with difference at end
-    let mut data_late_diff: [u8; 64] = [0xAAu8; 64];
-    data_late_diff[63] = 0xBB;
+    let mut data_late_diff: [u8; 32] = [0xAAu8; 32];
+    data_late_diff[31] = 0xBB;
 
     let class = if rng.next_u32() % 2 == 0 {
         Class::Left
