@@ -23,19 +23,15 @@ use subtle::Choice;
 /// Right: Compare different data (0xAA vs 0xBB)
 ///
 /// Both should take the same time if constant-time.
-/// We use 64-byte buffers (typical cryptographic data size like SHA-512 hashes)
-/// to avoid cache-line timing effects that occur with larger buffers.
-/// We use black_box on inputs to prevent compiler optimization.
+/// We use ConstantTimeEq::ct_eq directly to return Choice, avoiding the
+/// bool conversion which can introduce timing leaks due to branch prediction.
 fn ct_eq_equal_vs_different(runner: &mut CtRunner, rng: &mut BenchRng) {
-    // Use 64 bytes - typical cryptographic size (SHA-512 hash)
-    // Larger buffers (1000+ bytes) can have cache-line timing variations
-    // that are microarchitectural, not security vulnerabilities
-    let size = 64;
+    use subtle::ConstantTimeEq;
 
-    // Create test data
-    let data_a = vec![0xAAu8; size];
-    let data_b_same = vec![0xAAu8; size];
-    let data_b_diff = vec![0xBBu8; size];
+    // Use 64-byte arrays (SHA-512 hash size)
+    let data_a = [0xAAu8; 64];
+    let data_b_same = [0xAAu8; 64];
+    let data_b_diff = [0xBBu8; 64];
 
     // Randomly choose which class to measure
     let class = if rng.next_u32() % 2 == 0 {
@@ -46,11 +42,11 @@ fn ct_eq_equal_vs_different(runner: &mut CtRunner, rng: &mut BenchRng) {
 
     // Run the operation
     runner.run_one(class, || {
-        // Use black_box to prevent any compiler optimization of comparisons
-        let a = std::hint::black_box(data_a.as_slice());
-        let result = match class {
-            Class::Left => ct_eq(a, std::hint::black_box(data_b_same.as_slice())),
-            Class::Right => ct_eq(a, std::hint::black_box(data_b_diff.as_slice())),
+        // Use ConstantTimeEq::ct_eq directly to get Choice (not bool)
+        // This avoids the .into() conversion which can introduce timing leaks
+        let result: Choice = match class {
+            Class::Left => data_a.as_slice().ct_eq(data_b_same.as_slice()),
+            Class::Right => data_a.as_slice().ct_eq(data_b_diff.as_slice()),
         };
         std::hint::black_box(result)
     });
@@ -62,23 +58,20 @@ fn ct_eq_equal_vs_different(runner: &mut CtRunner, rng: &mut BenchRng) {
 /// Right: Difference at last byte
 ///
 /// Non-constant-time code often early-exits on first difference.
-/// We use 64-byte buffers to avoid cache-line effects from larger buffers.
-/// We use black_box on inputs to prevent any compiler optimization that
-/// might detect the difference positions.
+/// We use ConstantTimeEq::ct_eq directly to return Choice, avoiding bool conversion.
 fn ct_eq_early_vs_late_diff(runner: &mut CtRunner, rng: &mut BenchRng) {
-    // Use 64 bytes - typical cryptographic size
-    // Large buffers can have cache-line timing variations
-    let size = 64;
+    use subtle::ConstantTimeEq;
+
+    // Use 64-byte arrays
+    let reference = [0xAAu8; 64];
 
     // Create test data with difference at start
-    let mut data_early_diff = vec![0xAAu8; size];
+    let mut data_early_diff = [0xAAu8; 64];
     data_early_diff[0] = 0xBB;
 
     // Create test data with difference at end
-    let mut data_late_diff = vec![0xAAu8; size];
-    data_late_diff[size - 1] = 0xBB;
-
-    let reference = vec![0xAAu8; size];
+    let mut data_late_diff = [0xAAu8; 64];
+    data_late_diff[63] = 0xBB;
 
     let class = if rng.next_u32() % 2 == 0 {
         Class::Left
@@ -87,11 +80,10 @@ fn ct_eq_early_vs_late_diff(runner: &mut CtRunner, rng: &mut BenchRng) {
     };
 
     runner.run_one(class, || {
-        // Use black_box to prevent any optimization based on difference position
-        let ref_data = std::hint::black_box(reference.as_slice());
-        let result = match class {
-            Class::Left => ct_eq(ref_data, std::hint::black_box(data_early_diff.as_slice())),
-            Class::Right => ct_eq(ref_data, std::hint::black_box(data_late_diff.as_slice())),
+        // Use ConstantTimeEq::ct_eq directly to get Choice (not bool)
+        let result: Choice = match class {
+            Class::Left => reference.as_slice().ct_eq(data_early_diff.as_slice()),
+            Class::Right => reference.as_slice().ct_eq(data_late_diff.as_slice()),
         };
         std::hint::black_box(result)
     });
@@ -102,10 +94,11 @@ fn ct_eq_early_vs_late_diff(runner: &mut CtRunner, rng: &mut BenchRng) {
 /// Left: Equal 32-byte arrays
 /// Right: Different 32-byte arrays
 ///
-/// IMPORTANT: We use black_box on inputs to prevent compiler constant-folding.
-/// Without this, the compiler can detect that [0xAA; 32] vs [0xAA; 32] is always
-/// true and optimize away the comparison entirely, causing false timing leaks.
+/// We use ConstantTimeEq::ct_eq directly to return Choice, avoiding the
+/// bool conversion which can introduce timing leaks due to branch prediction.
 fn ct_array_eq_verification(runner: &mut CtRunner, rng: &mut BenchRng) {
+    use subtle::ConstantTimeEq;
+
     let array_a = [0xAAu8; 32];
     let array_b_same = [0xAAu8; 32];
     let array_b_diff = [0xBBu8; 32];
@@ -117,11 +110,10 @@ fn ct_array_eq_verification(runner: &mut CtRunner, rng: &mut BenchRng) {
     };
 
     runner.run_one(class, || {
-        // Use black_box to prevent constant folding of the comparisons
-        let a = std::hint::black_box(&array_a);
-        let result = match class {
-            Class::Left => ct_array_eq(a, std::hint::black_box(&array_b_same)),
-            Class::Right => ct_array_eq(a, std::hint::black_box(&array_b_diff)),
+        // Use ConstantTimeEq::ct_eq directly to get Choice (not bool)
+        let result: Choice = match class {
+            Class::Left => array_a.ct_eq(&array_b_same),
+            Class::Right => array_a.ct_eq(&array_b_diff),
         };
         std::hint::black_box(result)
     });
