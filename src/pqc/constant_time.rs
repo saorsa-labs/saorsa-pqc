@@ -218,65 +218,52 @@ pub fn ct_clear<T: Zeroize>(data: &mut T) {
 /// Constant-time conditional copy
 ///
 /// Copies `src` to `dest` if `choice` is true AND lengths match.
-/// The operation runs in constant time regardless of:
-/// - Whether the copy happens (choice value)
-/// - Whether lengths match
-/// - Content of the buffers
 ///
 /// # Returns
 /// `true` if lengths matched (copy may or may not have occurred based on `choice`),
 /// `false` if lengths did not match (no copy occurred).
 ///
-/// # Security Note
-/// This function is designed for FIPS 140-3 compliance. For truly constant-time
-/// behavior when lengths may differ significantly, consider using fixed-size
-/// buffer variants instead.
+/// # Security Properties
+/// - **Constant-time on `choice`**: Whether `choice` is true or false does not
+///   affect timing. This is the critical security property for FIPS 140-3.
+/// - **Constant-time on buffer contents**: The values in `src` and `dest` do not
+///   affect timing.
+/// - **Length is NOT secret**: Buffer lengths are public API parameters. Different
+///   lengths will have different timing, which is expected and not a vulnerability.
+///
+/// # Example
+/// ```
+/// use saorsa_pqc::pqc::constant_time::ct_copy_bytes;
+///
+/// let mut dest = [0u8; 4];
+/// let src = [1u8, 2, 3, 4];
+///
+/// // Copy happens (choice=true, lengths match)
+/// assert!(ct_copy_bytes(&mut dest, &src, true));
+/// assert_eq!(dest, [1, 2, 3, 4]);
+///
+/// // Reset and try with choice=false - no copy, but same timing
+/// dest = [0u8; 4];
+/// assert!(ct_copy_bytes(&mut dest, &src, false));
+/// assert_eq!(dest, [0, 0, 0, 0]); // Unchanged
+/// ```
 #[inline]
 #[must_use]
 pub fn ct_copy_bytes(dest: &mut [u8], src: &[u8], choice: bool) -> bool {
-    let dest_len = dest.len();
-    let src_len = src.len();
-
-    // Constant-time length comparison
-    let lengths_match = dest_len.ct_eq(&src_len);
-
-    // Combine choice with length check: only copy if both are true
-    let should_copy = Choice::from(u8::from(choice)) & lengths_match;
-
-    // Process the minimum length - this is where actual copy happens
-    let min_len = dest_len.min(src_len);
-
-    // Perform the conditional copy for overlapping portion
-    for i in 0..min_len {
-        dest[i].conditional_assign(&src[i], should_copy);
+    // Length mismatch is not a secret - early return is fine
+    if dest.len() != src.len() {
+        return false;
     }
 
-    // For the remaining bytes (when lengths differ), we need to do
-    // EQUIVALENT work to conditional_assign. We use a volatile write
-    // to a dummy location to ensure the compiler doesn't optimize differently.
-    let max_len = dest_len.max(src_len);
-    let mut dummy = 0u8;
+    // The critical constant-time property: choice doesn't affect timing
+    let should_copy = Choice::from(u8::from(choice));
 
-    for i in min_len..max_len {
-        // Read from whichever buffer extends further
-        let src_byte = if i < src_len {
-            src[i]
-        } else if i < dest_len {
-            dest[i]
-        } else {
-            0u8
-        };
-
-        // Perform conditional_assign on dummy to match the work profile
-        dummy.conditional_assign(&src_byte, should_copy);
+    // Constant-time conditional copy for each byte
+    for (d, s) in dest.iter_mut().zip(src.iter()) {
+        d.conditional_assign(s, should_copy);
     }
 
-    // Use black_box to ensure dummy operations aren't optimized away
-    // This is critical for constant-time behavior
-    let _ = black_box(dummy);
-
-    // Return whether lengths matched (constant-time conversion)
-    black_box(lengths_match.into())
+    true
 }
 
 #[cfg(test)]
