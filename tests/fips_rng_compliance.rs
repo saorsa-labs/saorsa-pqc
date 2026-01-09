@@ -220,18 +220,29 @@ fn test_small_requests() {
 
     // Test various small sizes
     for size in [1, 2, 3, 7, 15, 16, 31, 32, 63, 64] {
-        let mut buffer = vec![0u8; size];
-        rand_core::RngCore::fill_bytes(&mut rng, &mut buffer);
+        // For very small buffers (1-2 bytes), a single all-zeros result has
+        // non-trivial probability (0.4% for 1 byte, 0.0015% for 2 bytes).
+        // For robustness, we sample multiple times and check that at least one
+        // has non-zero content. For larger buffers (>= 8 bytes), probability
+        // of all zeros is astronomically low (2^-64), so single sample suffices.
+        let samples = if size < 8 { 10 } else { 1 };
+        let mut found_nonzero = false;
 
-        // Verify not all zeros
-        if size > 0 {
-            let all_zeros = buffer.iter().all(|&b| b == 0);
-            assert!(
-                !all_zeros,
-                "Small buffer of size {} should have randomness",
-                size
-            );
+        for _ in 0..samples {
+            let mut buffer = vec![0u8; size];
+            rand_core::RngCore::fill_bytes(&mut rng, &mut buffer);
+
+            if !buffer.iter().all(|&b| b == 0) {
+                found_nonzero = true;
+                break;
+            }
         }
+
+        assert!(
+            found_nonzero,
+            "Small buffer of size {} should have randomness (after {} samples)",
+            size, samples
+        );
     }
 }
 
