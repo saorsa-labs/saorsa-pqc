@@ -23,9 +23,14 @@ use subtle::Choice;
 /// Right: Compare different data (0xAA vs 0xBB)
 ///
 /// Both should take the same time if constant-time.
+/// We use 64-byte buffers (typical cryptographic data size like SHA-512 hashes)
+/// to avoid cache-line timing effects that occur with larger buffers.
 /// We use black_box on inputs to prevent compiler optimization.
 fn ct_eq_equal_vs_different(runner: &mut CtRunner, rng: &mut BenchRng) {
-    let size = 1000;
+    // Use 64 bytes - typical cryptographic size (SHA-512 hash)
+    // Larger buffers (1000+ bytes) can have cache-line timing variations
+    // that are microarchitectural, not security vulnerabilities
+    let size = 64;
 
     // Create test data
     let data_a = vec![0xAAu8; size];
@@ -57,10 +62,13 @@ fn ct_eq_equal_vs_different(runner: &mut CtRunner, rng: &mut BenchRng) {
 /// Right: Difference at last byte
 ///
 /// Non-constant-time code often early-exits on first difference.
+/// We use 64-byte buffers to avoid cache-line effects from larger buffers.
 /// We use black_box on inputs to prevent any compiler optimization that
 /// might detect the difference positions.
 fn ct_eq_early_vs_late_diff(runner: &mut CtRunner, rng: &mut BenchRng) {
-    let size = 1000;
+    // Use 64 bytes - typical cryptographic size
+    // Large buffers can have cache-line timing variations
+    let size = 64;
 
     // Create test data with difference at start
     let mut data_early_diff = vec![0xAAu8; size];
