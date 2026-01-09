@@ -23,6 +23,7 @@ use subtle::Choice;
 /// Right: Compare different data (0xAA vs 0xBB)
 ///
 /// Both should take the same time if constant-time.
+/// We use black_box on inputs to prevent compiler optimization.
 fn ct_eq_equal_vs_different(runner: &mut CtRunner, rng: &mut BenchRng) {
     let size = 1000;
 
@@ -40,9 +41,11 @@ fn ct_eq_equal_vs_different(runner: &mut CtRunner, rng: &mut BenchRng) {
 
     // Run the operation
     runner.run_one(class, || {
+        // Use black_box to prevent any compiler optimization of comparisons
+        let a = std::hint::black_box(data_a.as_slice());
         let result = match class {
-            Class::Left => ct_eq(&data_a, &data_b_same), // Equal comparison
-            Class::Right => ct_eq(&data_a, &data_b_diff), // Unequal comparison
+            Class::Left => ct_eq(a, std::hint::black_box(data_b_same.as_slice())),
+            Class::Right => ct_eq(a, std::hint::black_box(data_b_diff.as_slice())),
         };
         std::hint::black_box(result)
     });
@@ -54,6 +57,8 @@ fn ct_eq_equal_vs_different(runner: &mut CtRunner, rng: &mut BenchRng) {
 /// Right: Difference at last byte
 ///
 /// Non-constant-time code often early-exits on first difference.
+/// We use black_box on inputs to prevent any compiler optimization that
+/// might detect the difference positions.
 fn ct_eq_early_vs_late_diff(runner: &mut CtRunner, rng: &mut BenchRng) {
     let size = 1000;
 
@@ -74,9 +79,11 @@ fn ct_eq_early_vs_late_diff(runner: &mut CtRunner, rng: &mut BenchRng) {
     };
 
     runner.run_one(class, || {
+        // Use black_box to prevent any optimization based on difference position
+        let ref_data = std::hint::black_box(reference.as_slice());
         let result = match class {
-            Class::Left => ct_eq(&reference, &data_early_diff),
-            Class::Right => ct_eq(&reference, &data_late_diff),
+            Class::Left => ct_eq(ref_data, std::hint::black_box(data_early_diff.as_slice())),
+            Class::Right => ct_eq(ref_data, std::hint::black_box(data_late_diff.as_slice())),
         };
         std::hint::black_box(result)
     });
@@ -86,6 +93,10 @@ fn ct_eq_early_vs_late_diff(runner: &mut CtRunner, rng: &mut BenchRng) {
 ///
 /// Left: Equal 32-byte arrays
 /// Right: Different 32-byte arrays
+///
+/// IMPORTANT: We use black_box on inputs to prevent compiler constant-folding.
+/// Without this, the compiler can detect that [0xAA; 32] vs [0xAA; 32] is always
+/// true and optimize away the comparison entirely, causing false timing leaks.
 fn ct_array_eq_verification(runner: &mut CtRunner, rng: &mut BenchRng) {
     let array_a = [0xAAu8; 32];
     let array_b_same = [0xAAu8; 32];
@@ -98,9 +109,11 @@ fn ct_array_eq_verification(runner: &mut CtRunner, rng: &mut BenchRng) {
     };
 
     runner.run_one(class, || {
+        // Use black_box to prevent constant folding of the comparisons
+        let a = std::hint::black_box(&array_a);
         let result = match class {
-            Class::Left => ct_array_eq(&array_a, &array_b_same),
-            Class::Right => ct_array_eq(&array_a, &array_b_diff),
+            Class::Left => ct_array_eq(a, std::hint::black_box(&array_b_same)),
+            Class::Right => ct_array_eq(a, std::hint::black_box(&array_b_diff)),
         };
         std::hint::black_box(result)
     });

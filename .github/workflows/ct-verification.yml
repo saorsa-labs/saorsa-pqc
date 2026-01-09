@@ -66,12 +66,14 @@ jobs:
 
         # Run each benchmark for 30 seconds and capture results
         # Core constant-time primitives (quick check on every PR)
+        # NOTE: ct_copy_bytes_length_verification was removed - testing CT behavior
+        # across different buffer lengths is architecturally impossible and not
+        # a security requirement (lengths are public API parameters, not secrets)
         BENCHMARKS=(
           "ct_eq_equal_vs_different"
           "ct_eq_early_vs_late_diff"
           "ct_array_eq_verification"
           "ct_copy_bytes_choice_verification"
-          "ct_copy_bytes_length_verification"
           "ct_select_verification"
           "ct_tag_verify_matching_vs_mismatching"
           "ct_buffer_eq_32byte_keys"
@@ -174,13 +176,13 @@ jobs:
         mkdir -p ct_results_extended
 
         # All benchmarks including extended cryptographic scenarios
+        # NOTE: ct_copy_bytes_length_verification removed (see main job comment)
         BENCHMARKS=(
           # Core constant-time primitives
           "ct_eq_equal_vs_different"
           "ct_eq_early_vs_late_diff"
           "ct_array_eq_verification"
           "ct_copy_bytes_choice_verification"
-          "ct_copy_bytes_length_verification"
           "ct_select_verification"
           "ct_eq_random_data"
           "ct_eq_empty_slices"
