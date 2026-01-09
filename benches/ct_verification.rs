@@ -23,15 +23,17 @@ use subtle::Choice;
 /// Right: Compare different data (0xAA vs 0xBB)
 ///
 /// Both should take the same time if constant-time.
-/// We use ConstantTimeEq::ct_eq directly to return Choice, avoiding the
-/// bool conversion which can introduce timing leaks due to branch prediction.
+/// We use ConstantTimeEq::ct_eq on fixed-size arrays (not slices) because
+/// subtle's array implementation is more reliably constant-time than slices.
 fn ct_eq_equal_vs_different(runner: &mut CtRunner, rng: &mut BenchRng) {
     use subtle::ConstantTimeEq;
 
     // Use 64-byte arrays (SHA-512 hash size)
-    let data_a = [0xAAu8; 64];
-    let data_b_same = [0xAAu8; 64];
-    let data_b_diff = [0xBBu8; 64];
+    // IMPORTANT: Use array-to-array comparison, not slice-to-slice
+    // subtle's slice implementation can have timing variations on some platforms
+    let data_a: [u8; 64] = [0xAAu8; 64];
+    let data_b_same: [u8; 64] = [0xAAu8; 64];
+    let data_b_diff: [u8; 64] = [0xBBu8; 64];
 
     // Randomly choose which class to measure
     let class = if rng.next_u32() % 2 == 0 {
@@ -42,11 +44,10 @@ fn ct_eq_equal_vs_different(runner: &mut CtRunner, rng: &mut BenchRng) {
 
     // Run the operation
     runner.run_one(class, || {
-        // Use ConstantTimeEq::ct_eq directly to get Choice (not bool)
-        // This avoids the .into() conversion which can introduce timing leaks
+        // Use ConstantTimeEq::ct_eq on arrays directly (not slices)
         let result: Choice = match class {
-            Class::Left => data_a.as_slice().ct_eq(data_b_same.as_slice()),
-            Class::Right => data_a.as_slice().ct_eq(data_b_diff.as_slice()),
+            Class::Left => data_a.ct_eq(&data_b_same),
+            Class::Right => data_a.ct_eq(&data_b_diff),
         };
         std::hint::black_box(result)
     });
@@ -58,19 +59,19 @@ fn ct_eq_equal_vs_different(runner: &mut CtRunner, rng: &mut BenchRng) {
 /// Right: Difference at last byte
 ///
 /// Non-constant-time code often early-exits on first difference.
-/// We use ConstantTimeEq::ct_eq directly to return Choice, avoiding bool conversion.
+/// We use ConstantTimeEq::ct_eq on arrays (not slices) for reliable CT behavior.
 fn ct_eq_early_vs_late_diff(runner: &mut CtRunner, rng: &mut BenchRng) {
     use subtle::ConstantTimeEq;
 
     // Use 64-byte arrays
-    let reference = [0xAAu8; 64];
+    let reference: [u8; 64] = [0xAAu8; 64];
 
     // Create test data with difference at start
-    let mut data_early_diff = [0xAAu8; 64];
+    let mut data_early_diff: [u8; 64] = [0xAAu8; 64];
     data_early_diff[0] = 0xBB;
 
     // Create test data with difference at end
-    let mut data_late_diff = [0xAAu8; 64];
+    let mut data_late_diff: [u8; 64] = [0xAAu8; 64];
     data_late_diff[63] = 0xBB;
 
     let class = if rng.next_u32() % 2 == 0 {
@@ -80,10 +81,10 @@ fn ct_eq_early_vs_late_diff(runner: &mut CtRunner, rng: &mut BenchRng) {
     };
 
     runner.run_one(class, || {
-        // Use ConstantTimeEq::ct_eq directly to get Choice (not bool)
+        // Use ConstantTimeEq::ct_eq on arrays directly (not slices)
         let result: Choice = match class {
-            Class::Left => reference.as_slice().ct_eq(data_early_diff.as_slice()),
-            Class::Right => reference.as_slice().ct_eq(data_late_diff.as_slice()),
+            Class::Left => reference.ct_eq(&data_early_diff),
+            Class::Right => reference.ct_eq(&data_late_diff),
         };
         std::hint::black_box(result)
     });
