@@ -32,35 +32,12 @@ jobs:
         restore-keys: |
           ${{ runner.os }}-cargo-
 
-    - name: Create benches directory
-      run: mkdir -p benches
-
-    - name: Create placeholder benchmarks
-      run: |
-        cat > benches/ml_kem_benchmarks.rs <<'EOF'
-        use criterion::{black_box, criterion_group, criterion_main, Criterion};
-
-        fn benchmark_placeholder(c: &mut Criterion) {
-            c.bench_function("placeholder", |b| b.iter(|| black_box(42)));
-        }
-
-        criterion_group!(benches, benchmark_placeholder);
-        criterion_main!(benches);
-        EOF
-
-        cat > benches/ml_dsa_benchmarks.rs <<'EOF'
-        use criterion::{black_box, criterion_group, criterion_main, Criterion};
-
-        fn benchmark_placeholder(c: &mut Criterion) {
-            c.bench_function("placeholder", |b| b.iter(|| black_box(42)));
-        }
-
-        criterion_group!(benches, benchmark_placeholder);
-        criterion_main!(benches);
-        EOF
-
     - name: Run benchmarks
-      run: cargo bench
+      run: |
+        # Run only Criterion-compatible benchmarks
+        # ct_verification uses DudeCT which has incompatible CLI (no --bench flag)
+        # and is already tested by the dedicated ct-verification.yml workflow
+        cargo bench --features benchmarks --bench ml_kem_benchmarks --bench ml_dsa_benchmarks --bench comprehensive_benchmarks
 
     - name: Upload benchmark results
       uses: actions/upload-artifact@v4
