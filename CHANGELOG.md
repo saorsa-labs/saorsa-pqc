@@ -5,6 +5,41 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [0.5.2] - 2026-09-21
+
+### Added
+- Browser WASM support: the library compiles for `wasm32-unknown-unknown`
+  with JavaScript-backed `getrandom` entropy (Web Crypto) and a
+  compile-only WASM CI job; documented in `docs/wasm.md`.
+
+### Changed
+- Removed unused runtime dependencies (`tokio` moved to development
+  dependencies; `futures`, `rayon`, `libc`, and the unreferenced `hpke`
+  crate removed), dropping the unused elliptic-curve stack from the
+  dependency graph.
+
+### Fixed
+- Provides a clean, verifiable successor after the published `0.5.1` crate
+  was produced from a dirty worktree before its canonical tag was created.
+- Updated package and README links to the canonical
+  `saorsa-labs/saorsa-pqc` repository.
+- Raised the declared minimum supported Rust version from 1.85 to 1.88.
+- Excluded local planning, agent, backup, and patch artefacts from crate
+  packages.
+- Cleared known RustSec vulnerabilities from the `0.5.1` dependency graph;
+  non-vulnerability development/transitive dependency warnings remain
+  explicitly allowed by the repository audit policy.
+
+### Release process
+- Release validation packages the crate and verifies that
+  `.cargo_vcs_info.json` records the exact release commit without a dirty
+  worktree marker.
+- Only canonical `v*` tag pushes may publish; manual dispatches are
+  validation-only.
+- After publication, the workflow downloads the crates.io artifact and checks
+  its registry checksum, source commit, clean-worktree provenance, and package
+  hygiene before creating the GitHub Release.
+
 ## [0.4.0] - 2025-01-08
 
 ### Added

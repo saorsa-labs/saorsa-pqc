@@ -2,8 +2,8 @@
 
 [![Crates.io](https://img.shields.io/crates/v/saorsa-pqc.svg)](https://crates.io/crates/saorsa-pqc)
 [![Documentation](https://docs.rs/saorsa-pqc/badge.svg)](https://docs.rs/saorsa-pqc)
-[![License](https://img.shields.io/badge/license-MIT%2FApache--2.0-blue.svg)](https://github.com/dirvine/saorsa-pqc)
-[![Build Status](https://github.com/dirvine/saorsa-pqc/workflows/CI/badge.svg)](https://github.com/dirvine/saorsa-pqc/actions)
+[![License](https://img.shields.io/badge/license-MIT%2FApache--2.0-blue.svg)](https://github.com/saorsa-labs/saorsa-pqc)
+[![Build Status](https://github.com/saorsa-labs/saorsa-pqc/actions/workflows/linux-tests.yml/badge.svg)](https://github.com/saorsa-labs/saorsa-pqc/actions/workflows/linux-tests.yml)
 
 A comprehensive, production-ready Post-Quantum Cryptography library providing a complete quantum-secure cryptographic suite. Implements NIST FIPS 203, 204, and 205 standardized algorithms for asymmetric cryptography, plus comprehensive cryptographic primitives including BLAKE3, SHA3, HMAC, HKDF, AES-256-GCM, and ChaCha20-Poly1305. This library provides high-performance, thoroughly tested implementations with a clean, safe API, all validated against official NIST ACVP, RFC, and specification test vectors.
 
@@ -25,7 +25,7 @@ A comprehensive, production-ready Post-Quantum Cryptography library providing a 
 
 ```toml
 [dependencies]
-saorsa-pqc = "0.4"
+saorsa-pqc = "0.5"
 ```
 
 ## 🔐 Supported Algorithms
@@ -570,7 +570,7 @@ Contributions are welcome! Please feel free to submit issues and pull requests.
 
 ```bash
 # Clone the repository
-git clone https://github.com/dirvine/saorsa-pqc
+git clone https://github.com/saorsa-labs/saorsa-pqc
 cd saorsa-pqc
 
 # Run tests

@@ -10,12 +10,8 @@ on:
   workflow_dispatch:
     inputs:
       version:
-        description: 'Version to release (e.g., v0.5.0)'
+        description: 'Version to validate (e.g., v0.5.2); manual runs never publish'
         required: true
-      dry_run:
-        description: 'Dry run (no actual publish)'
-        type: boolean
-        default: false
 
 env:
   CARGO_TERM_COLOR: always
@@ -34,14 +30,27 @@ jobs:
         with:
           fetch-depth: 0
 
+      - name: Install Rust
+        uses: dtolnay/rust-toolchain@stable
+
       - name: Extract version
         id: version
+        env:
+          DISPATCH_VERSION: ${{ inputs.version }}
+          EVENT_NAME: ${{ github.event_name }}
         run: |
-          if [[ "${{ github.event_name }}" == "workflow_dispatch" ]]; then
-            VERSION="${{ github.event.inputs.version }}"
+          if [[ "$EVENT_NAME" == "workflow_dispatch" ]]; then
+            VERSION="$DISPATCH_VERSION"
           else
             VERSION="${GITHUB_REF#refs/tags/}"
           fi
+
+          VERSION_REGEX="^v[0-9]+\.[0-9]+\.[0-9]+(-[a-zA-Z0-9]+(\.[0-9]+)?)?$"
+          if ! [[ "$VERSION" =~ $VERSION_REGEX ]]; then
+            echo "::error::Invalid version format: $VERSION"
+            exit 1
+          fi
+
           echo "version=$VERSION" >> $GITHUB_OUTPUT
 
           VERSION_NUMBER="${VERSION#v}"
@@ -55,24 +64,71 @@ jobs:
 
           echo "Version: $VERSION (number: $VERSION_NUMBER)"
 
-      - name: Validate version format
-        run: |
-          VERSION="${{ steps.version.outputs.version }}"
-          VERSION_REGEX="^v[0-9]+\.[0-9]+\.[0-9]+(-[a-zA-Z0-9]+(\.[0-9]+)?)?$"
-          if ! [[ "$VERSION" =~ $VERSION_REGEX ]]; then
-            echo "::error::Invalid version format: $VERSION"
-            exit 1
-          fi
-
-      - name: Check Cargo.toml version
+      - name: Verify Cargo.toml version
+        env:
+          EXPECTED: ${{ steps.version.outputs.version_number }}
         run: |
           CARGO_VERSION=$(grep "^version" Cargo.toml | head -1 | cut -d'"' -f2)
-          EXPECTED="${{ steps.version.outputs.version_number }}"
           if [[ "$CARGO_VERSION" != "$EXPECTED" ]]; then
             echo "::error::Cargo.toml version mismatch"
             echo "::error::Expected $EXPECTED but found $CARGO_VERSION"
             exit 1
           fi
+
+      - name: Verify packaged source provenance
+        env:
+          EXPECTED_SHA: ${{ github.sha }}
+          VERSION_NUMBER: ${{ steps.version.outputs.version_number }}
+        run: |
+          if [[ -n "$(git status --porcelain --untracked-files=no)" ]]; then
+            echo "::error::Tracked worktree is dirty before packaging"
+            git status --short
+            exit 1
+          fi
+
+          cargo package --locked
+
+          python3 - <<'PY'
+          import json
+          import os
+          import tarfile
+          from pathlib import Path
+
+          version = os.environ["VERSION_NUMBER"]
+          expected_sha = os.environ["EXPECTED_SHA"]
+          crate_path = Path("target/package") / f"saorsa-pqc-{version}.crate"
+
+          with tarfile.open(crate_path, "r:gz") as archive:
+              root = f"saorsa-pqc-{version}"
+              member = archive.getmember(f"{root}/.cargo_vcs_info.json")
+              source = archive.extractfile(member)
+              if source is None:
+                  raise SystemExit("missing .cargo_vcs_info.json in crate")
+              vcs = json.load(source)["git"]
+              names = archive.getnames()
+
+          if vcs.get("sha1") != expected_sha:
+              raise SystemExit(
+                  f"crate SHA {vcs.get('sha1')} != release SHA {expected_sha}"
+              )
+          # Cargo omits `dirty` for a clean package and emits it only when true.
+          if "dirty" in vcs:
+              raise SystemExit(f"crate provenance has dirty marker: {vcs['dirty']}")
+
+          forbidden_parts = {".claude", ".hermes-audit", ".pi", ".planning"}
+          forbidden_names = {"memory_pool_complete_fix.rs", "test_fips_basic.rs"}
+          for name in names:
+              relative = name.removeprefix(f"{root}/")
+              parts = set(relative.split("/"))
+              if (
+                  parts & forbidden_parts
+                  or relative.endswith((".bak", ".patch"))
+                  or relative in forbidden_names
+              ):
+                  raise SystemExit(f"forbidden packaged artifact: {relative}")
+
+          print(f"verified clean crate provenance at {expected_sha}")
+          PY
 
   test:
     name: Test Suite
@@ -125,7 +181,7 @@ jobs:
     name: Publish to crates.io
     needs: [validate, test, security-audit]
     runs-on: ubuntu-latest
-    if: github.event.inputs.dry_run != 'true'
+    if: github.event_name == 'push' && startsWith(github.ref, 'refs/tags/v')
     steps:
       - uses: actions/checkout@v4
 
@@ -147,12 +203,123 @@ jobs:
           key: ${{ runner.os }}-cargo-publish-${{ hashFiles('**/Cargo.lock') }}
 
       - name: Verify crate
-        run: cargo publish --dry-run
+        run: cargo publish --dry-run --locked
+
+      - name: Verify pushed tag still targets release commit
+        env:
+          EXPECTED_SHA: ${{ github.sha }}
+          VERSION: ${{ needs.validate.outputs.version }}
+        run: |
+          git fetch --force --no-tags origin \
+            "refs/tags/$VERSION:refs/tags/$VERSION"
+          TAG_SHA=$(git rev-parse "$VERSION^{commit}")
+          if [[ "$TAG_SHA" != "$EXPECTED_SHA" ]]; then
+            echo "::error::Remote tag $VERSION points to $TAG_SHA, not $EXPECTED_SHA"
+            exit 1
+          fi
 
       - name: Publish to crates.io
+        # A rerun may see "version already exists" after a successful publish.
+        # The following registry verification is the authoritative success gate.
+        continue-on-error: true
         env:
           CARGO_REGISTRY_TOKEN: ${{ secrets.CRATES_IO_TOKEN }}
-        run: cargo publish
+        run: cargo publish --locked
+
+      - name: Verify published crates.io artifact
+        env:
+          EXPECTED_SHA: ${{ github.sha }}
+          VERSION_NUMBER: ${{ needs.validate.outputs.version_number }}
+        run: |
+          python3 - <<'PY'
+          import hashlib
+          import io
+          import json
+          import os
+          import tarfile
+          import time
+          import urllib.error
+          import urllib.request
+
+          version = os.environ["VERSION_NUMBER"]
+          expected_sha = os.environ["EXPECTED_SHA"]
+          user_agent = "saorsa-pqc-release-provenance/1.0"
+          api_url = f"https://crates.io/api/v1/crates/saorsa-pqc/{version}"
+          crate_url = (
+              "https://static.crates.io/crates/saorsa-pqc/"
+              f"saorsa-pqc-{version}.crate"
+          )
+
+          def fetch(url):
+              request = urllib.request.Request(
+                  url,
+                  headers={"User-Agent": user_agent},
+              )
+              with urllib.request.urlopen(request, timeout=30) as response:
+                  return response.read()
+
+          for attempt in range(12):
+              try:
+                  metadata = json.loads(fetch(api_url))
+                  expected_checksum = metadata["version"]["checksum"]
+                  crate_bytes = fetch(crate_url)
+                  actual_checksum = hashlib.sha256(crate_bytes).hexdigest()
+                  if actual_checksum != expected_checksum:
+                      raise RuntimeError(
+                          f"registry checksum {expected_checksum} != "
+                          f"download {actual_checksum}"
+                      )
+                  break
+              except urllib.error.HTTPError as error:
+                  retryable = error.code in {404, 429} or error.code >= 500
+                  if not retryable or attempt == 11:
+                      raise
+              except (
+                  urllib.error.URLError,
+                  json.JSONDecodeError,
+                  KeyError,
+                  RuntimeError,
+              ):
+                  if attempt == 11:
+                      raise
+              time.sleep(10)
+          else:
+              raise SystemExit("published crate did not become available")
+
+          with tarfile.open(fileobj=io.BytesIO(crate_bytes), mode="r:gz") as archive:
+              root = f"saorsa-pqc-{version}"
+              source = archive.extractfile(f"{root}/.cargo_vcs_info.json")
+              if source is None:
+                  raise SystemExit("published crate lacks .cargo_vcs_info.json")
+              vcs = json.load(source)["git"]
+              names = archive.getnames()
+
+          if vcs.get("sha1") != expected_sha:
+              raise SystemExit(
+                  f"published crate SHA {vcs.get('sha1')} != {expected_sha}"
+              )
+          if "dirty" in vcs:
+              raise SystemExit(
+                  f"published crate has dirty marker: {vcs['dirty']}"
+              )
+
+          forbidden_parts = {".claude", ".hermes-audit", ".pi", ".planning"}
+          forbidden_names = {"memory_pool_complete_fix.rs", "test_fips_basic.rs"}
+          for name in names:
+              relative = name.removeprefix(f"{root}/")
+              parts = set(relative.split("/"))
+              if (
+                  parts & forbidden_parts
+                  or relative.endswith((".bak", ".patch"))
+                  or relative in forbidden_names
+              ):
+                  raise SystemExit(f"forbidden packaged artifact: {relative}")
+
+          print(
+              "verified published crate "
+              f"sha={expected_sha} checksum={actual_checksum}"
+          )
+          PY
 
   release:
     name: Create GitHub Release
@@ -160,11 +327,24 @@ jobs:
     runs-on: ubuntu-latest
     permissions:
       contents: write
-    if: github.event.inputs.dry_run != 'true'
+    if: github.event_name == 'push' && startsWith(github.ref, 'refs/tags/v')
     steps:
       - uses: actions/checkout@v4
         with:
           fetch-depth: 0
+
+      - name: Verify pushed tag still targets release commit
+        env:
+          EXPECTED_SHA: ${{ github.sha }}
+          VERSION: ${{ needs.validate.outputs.version }}
+        run: |
+          git fetch --force --no-tags origin \
+            "refs/tags/$VERSION:refs/tags/$VERSION"
+          TAG_SHA=$(git rev-parse "$VERSION^{commit}")
+          if [[ "$TAG_SHA" != "$EXPECTED_SHA" ]]; then
+            echo "::error::Remote tag $VERSION points to $TAG_SHA, not $EXPECTED_SHA"
+            exit 1
+          fi
 
       - name: Generate changelog
         id: changelog
@@ -187,6 +367,7 @@ jobs:
         uses: softprops/action-gh-release@v2
         with:
           tag_name: ${{ needs.validate.outputs.version }}
+          target_commitish: ${{ github.sha }}
           draft: false
           prerelease: ${{ needs.validate.outputs.is_prerelease }}
           generate_release_notes: true

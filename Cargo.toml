@@ -1,18 +1,30 @@
 [package]
 name = "saorsa-pqc"
-version = "0.5.1"
+version = "0.5.2"
 edition = "2021"
 authors = ["David Irvine <david@saorsalabs.com>"]
 license = "MIT OR Apache-2.0"
 description = "Post-Quantum Cryptography library for Saorsa Labs projects"
-homepage = "https://github.com/dirvine/saorsa-pqc"
-repository = "https://github.com/dirvine/saorsa-pqc"
+homepage = "https://github.com/saorsa-labs/saorsa-pqc"
+repository = "https://github.com/saorsa-labs/saorsa-pqc"
 documentation = "https://docs.rs/saorsa-pqc"
 keywords = ["cryptography", "post-quantum", "ml-kem", "ml-dsa", "quic"]
 categories = ["cryptography", "network-programming"]
 readme = "README.md"
 rust-version = "1.88.0"
-exclude = ["tests/nist_vectors/*", "*.profraw", "scripts/*"]
+exclude = [
+    "tests/nist_vectors/*",
+    "*.profraw",
+    "scripts/*",
+    ".claude/**",
+    ".hermes-audit/**",
+    ".pi/**",
+    ".planning/**",
+    "*.bak",
+    "*.patch",
+    "memory_pool_complete_fix.rs",
+    "test_fips_basic.rs",
+]
 
 [lib]
 name = "saorsa_pqc"
