@@ -5,7 +5,18 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
-## [0.5.2] - 2026-08-07
+## [0.5.2] - 2026-09-21
+
+### Added
+- Browser WASM support: the library compiles for `wasm32-unknown-unknown`
+  with JavaScript-backed `getrandom` entropy (Web Crypto) and a
+  compile-only WASM CI job; documented in `docs/wasm.md`.
+
+### Changed
+- Removed unused runtime dependencies (`tokio` moved to development
+  dependencies; `futures`, `rayon`, `libc`, and the unreferenced `hpke`
+  crate removed), dropping the unused elliptic-curve stack from the
+  dependency graph.
 
 ### Fixed
 - Provides a clean, verifiable successor after the published `0.5.1` crate
