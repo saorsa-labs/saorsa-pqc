@@ -57,6 +57,3 @@ Thumbs.db
 
 # Runtime artifacts
 *.log
-# Local task tracking
-.beads/
-AGENTS.md
