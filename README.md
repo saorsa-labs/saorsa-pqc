@@ -587,8 +587,8 @@ cargo fmt --check
 ## 📄 License
 
 This project is dual-licensed under:
-- MIT License
-- Apache License 2.0
+- MIT License ([LICENSE-MIT](LICENSE-MIT))
+- Apache License 2.0 ([LICENSE-APACHE](LICENSE-APACHE))
 
 Choose whichever license works best for your use case.
 
