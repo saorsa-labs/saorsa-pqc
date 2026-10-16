@@ -87,8 +87,8 @@ jobs:
           echo ""
           echo "=== Testing: $bench ==="
 
-          # Run benchmark in background, capture output
-          timeout 30s $CT_BINARY --continuous "$bench" > "ct_results/${bench}.log" 2>&1 || true
+          # Full 30s sample. Only the final max_t line is stored.
+          bash scripts/ct_capture.sh "$CT_BINARY" "$bench" 30 "ct_results/${bench}.log"
 
           # Extract the last max_t value
           if [ -f "ct_results/${bench}.log" ]; then
@@ -151,10 +151,7 @@ jobs:
     if: github.event_name == 'schedule' || github.event_name == 'workflow_dispatch'
 
     steps:
-    - name: Free disk space (github runners ship with ~30GB free, the
-            1h14m extended CT build + 17 5-minute benchmark logs has
-            been OOMing the runner — see
-            https://github.com/saorsa-labs/saorsa-pqc/actions/runs/27484255939)
+    - name: Free disk space
       run: |
         echo "::group::disk before"
         df -h
@@ -163,6 +160,10 @@ jobs:
         # paths are the documented safe set on the ubuntu-latest GitHub
         # Actions runner image; they exist on every runner and are
         # non-critical for cargo + rustc.
+        # DudeCT's per-sample transcript is not written here anymore
+        # (scripts/ct_capture.sh keeps the final max_t line). A 5-minute
+        # bench is ~7 GiB of stdout; 17 of them exceed the free disk
+        # that this cleanup can recover.
         sudo rm -rf \
           /usr/share/dotnet \
           /usr/local/lib/android \
@@ -234,7 +235,8 @@ jobs:
         for bench in "${BENCHMARKS[@]}"; do
           echo ""
           echo "=== Extended Testing: $bench (5 minutes) ==="
-          timeout 300s $CT_BINARY --continuous "$bench" > "ct_results_extended/${bench}.log" 2>&1 || true
+          # Full 300s sample. Only the final max_t line is stored.
+          bash scripts/ct_capture.sh "$CT_BINARY" "$bench" 300 "ct_results_extended/${bench}.log"
 
           if [ -f "ct_results_extended/${bench}.log" ]; then
             LAST_LINE=$(grep "max t =" "ct_results_extended/${bench}.log" | tail -1)
@@ -306,7 +308,8 @@ jobs:
           echo ""
           echo "=== ARM64 Testing: $bench ==="
 
-          timeout 60s $CT_BINARY --continuous "$bench" > "ct_results_arm64/${bench}.log" 2>&1 || true
+          # Full 60s sample. Only the final max_t line is stored.
+          bash scripts/ct_capture.sh "$CT_BINARY" "$bench" 60 "ct_results_arm64/${bench}.log"
 
           if [ -f "ct_results_arm64/${bench}.log" ]; then
             LAST_LINE=$(grep "max t =" "ct_results_arm64/${bench}.log" | tail -1)
@@ -403,7 +406,8 @@ jobs:
           echo ""
           echo "=== Chaos Testing: $bench (under CPU stress) ==="
 
-          timeout 45s $CT_BINARY --continuous "$bench" > "ct_results_chaos/${bench}.log" 2>&1 || true
+          # Full 45s sample. Only the final max_t line is stored.
+          bash scripts/ct_capture.sh "$CT_BINARY" "$bench" 45 "ct_results_chaos/${bench}.log"
 
           if [ -f "ct_results_chaos/${bench}.log" ]; then
             LAST_LINE=$(grep "max t =" "ct_results_chaos/${bench}.log" | tail -1)
