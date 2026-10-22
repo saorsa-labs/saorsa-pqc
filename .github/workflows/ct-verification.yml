@@ -19,6 +19,17 @@ env:
   CT_THRESHOLD: "3.0"
 
 jobs:
+  ct-capture-tests:
+    name: CT capture script tests
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Run capture script regression tests
+        run: bash scripts/ct_capture_test.sh
+
   ct-verification:
     name: DudeCT Timing Analysis
     runs-on: ubuntu-latest
