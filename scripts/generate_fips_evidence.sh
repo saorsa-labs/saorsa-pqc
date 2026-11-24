@@ -206,11 +206,11 @@ for i in "${!BENCHMARKS[@]}"; do
             if [ "$EXCEEDS" = "1" ]; then
                 echo -e "  ${RED}⚠️  POTENTIAL TIMING LEAK (|t| = $ABS_MAX_T > $CT_THRESHOLD)${NC}"
                 STATUS="⚠️ WARN"
-                ((FAILED++))
+                FAILED=$((FAILED + 1))
             else
                 echo -e "  ${GREEN}✅ PASS (|t| = $ABS_MAX_T < $CT_THRESHOLD)${NC}"
                 STATUS="✅ PASS"
-                ((PASSED++))
+                PASSED=$((PASSED + 1))
             fi
 
             # Add to summary
@@ -218,12 +218,12 @@ for i in "${!BENCHMARKS[@]}"; do
         else
             echo -e "  ${RED}⚠️  No max_t value found in output${NC}"
             echo "| \`$bench\` | - | - | ⚠️ NO DATA |" >> "$RESULTS_SUMMARY"
-            ((FAILED++))
+            FAILED=$((FAILED + 1))
         fi
     else
         echo -e "  ${RED}⚠️  No output file generated${NC}"
         echo "| \`$bench\` | - | - | ❌ ERROR |" >> "$RESULTS_SUMMARY"
-        ((FAILED++))
+        FAILED=$((FAILED + 1))
     fi
 done
 

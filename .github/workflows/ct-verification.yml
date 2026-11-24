@@ -72,7 +72,6 @@ jobs:
         echo "CT_BINARY=$CT_BINARY" >> "$GITHUB_ENV"
 
     - name: Run constant-time verification (quick check)
-      id: ct_quick
       run: |
         echo "Running DudeCT constant-time verification..."
 
