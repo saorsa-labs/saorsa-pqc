@@ -136,9 +136,12 @@ cd "$PROJECT_ROOT"
 cargo build --release --bench ct_verification 2>&1 | tee "$EVIDENCE_DIR/build.log"
 
 # Find the benchmark binary
-CT_BINARY=$(ls ./target/release/deps/ct_verification-* 2>/dev/null | grep -v '\.d$' | head -1)
-if [ -z "$CT_BINARY" ]; then
-    echo -e "${RED}Error: CT verification binary not found${NC}"
+command -v jq >/dev/null || { echo -e "${RED}INFRA: jq is required to locate the ct_verification bench executable${NC}" >&2; exit 1; }
+CT_BINARY=$(cargo build --release --bench ct_verification --message-format=json 2>/dev/null \
+    | jq -r 'select(.reason=="compiler-artifact" and .target.name=="ct_verification" and .executable!=null) | .executable' \
+    | tail -1)
+if [ -z "$CT_BINARY" ] || [ ! -x "$CT_BINARY" ]; then
+    echo -e "${RED}INFRA: ct_verification bench executable not found (cargo build-dir layout?) - no CT measurement was taken${NC}" >&2
     exit 1
 fi
 echo -e "${GREEN}Binary: $CT_BINARY${NC}"
