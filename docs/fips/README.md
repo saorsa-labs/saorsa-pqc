@@ -45,7 +45,9 @@ cargo bench --bench ct_verification -- --continuous ct_eq_equal_vs_different
 
 ## Evidence Generation
 
-For FIPS audit purposes, generate a complete evidence package:
+For FIPS audit purposes, generate a complete evidence package. The script
+requires `jq` (it reads the bench executable path from cargo's JSON output) and
+checks for it before building:
 
 ```bash
 # Quick verification (~5 minutes)

@@ -8,6 +8,8 @@
 #   --extended: 5 minutes per test (~90 minutes total)
 #   --full:     10 minutes per test (~3 hours total)
 #
+# Requires: cargo, jq
+#
 
 set -e
 
@@ -48,6 +50,8 @@ GREEN='\033[0;32m'
 YELLOW='\033[1;33m'
 BLUE='\033[0;34m'
 NC='\033[0m' # No Color
+
+command -v jq >/dev/null || { echo -e "${RED}INFRA: jq is required to locate the ct_verification bench executable${NC}" >&2; exit 1; }
 
 echo -e "${BLUE}╔════════════════════════════════════════════════════════════════╗${NC}"
 echo -e "${BLUE}║       FIPS 140-3 Constant-Time Evidence Generator              ║${NC}"
@@ -136,7 +140,6 @@ cd "$PROJECT_ROOT"
 cargo build --release --bench ct_verification 2>&1 | tee "$EVIDENCE_DIR/build.log"
 
 # Find the benchmark binary
-command -v jq >/dev/null || { echo -e "${RED}INFRA: jq is required to locate the ct_verification bench executable${NC}" >&2; exit 1; }
 CT_BINARY=$(cargo build --release --bench ct_verification --message-format=json 2>/dev/null \
     | jq -r 'select(.reason=="compiler-artifact" and .target.name=="ct_verification" and .executable!=null) | .executable' \
     | tail -1)
@@ -277,7 +280,7 @@ MANIFEST="$EVIDENCE_DIR/MANIFEST.md"
     echo ""
     echo "## Verification"
     echo ""
-    echo "To reproduce these results:"
+    echo "To reproduce these results (requires \`jq\`):"
     echo ""
     echo "\`\`\`bash"
     echo "git checkout $(git rev-parse HEAD)"

@@ -28,7 +28,7 @@ jobs:
 
     - name: Security audit
       # Ignored advisories (unmaintained crate warnings, not vulnerabilities):
-      # - RUSTSEC-2024-0375: winnow (transitive, no security impact)
+      # - RUSTSEC-2024-0375: atty unmaintained (transitive, no security impact)
       # - RUSTSEC-2021-0145: atty (transitive, no security impact)
       # - RUSTSEC-2021-0139: ansi_term (transitive via dudect-bencher dev dep)
       run: |
