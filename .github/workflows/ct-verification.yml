@@ -40,7 +40,9 @@ jobs:
       uses: actions/checkout@v4
 
     - name: Install Rust
-      uses: dtolnay/rust-toolchain@stable
+      uses: dtolnay/rust-toolchain@master
+      with:
+        toolchain: 1.100.0
 
     - name: Cache cargo registry
       uses: actions/cache@v4
@@ -56,21 +58,22 @@ jobs:
     - name: Build CT verification benchmarks
       run: cargo build --release --bench ct_verification
 
-    - name: Run constant-time verification (quick check)
-      id: ct_quick
+    - name: Locate CT verification binary
       run: |
-        echo "Running DudeCT constant-time verification..."
-
-        # Run benchmarks for 30 seconds each, capture output
-        CT_BENCH="./target/release/deps/ct_verification-*"
-        CT_BINARY=$(ls $CT_BENCH 2>/dev/null | head -1)
-
-        if [ -z "$CT_BINARY" ]; then
-          echo "Error: CT verification binary not found"
+        command -v jq >/dev/null || { sudo apt-get update && sudo apt-get install -y jq; }
+        CT_BINARY=$(cargo build --release --bench ct_verification --message-format=json \
+          | jq -r 'select(.reason=="compiler-artifact" and .target.name=="ct_verification" and .executable!=null) | .executable' \
+          | tail -1)
+        if [ -z "$CT_BINARY" ] || [ ! -x "$CT_BINARY" ]; then
+          echo "::error::INFRA: ct_verification bench executable not found (cargo build-dir layout?) - no CT measurement was taken"
           exit 1
         fi
-
         echo "Binary: $CT_BINARY"
+        echo "CT_BINARY=$CT_BINARY" >> "$GITHUB_ENV"
+
+    - name: Run constant-time verification (quick check)
+      run: |
+        echo "Running DudeCT constant-time verification..."
 
         # Create output directory
         mkdir -p ct_results
@@ -197,7 +200,9 @@ jobs:
       uses: actions/checkout@v4
 
     - name: Install Rust
-      uses: dtolnay/rust-toolchain@stable
+      uses: dtolnay/rust-toolchain@master
+      with:
+        toolchain: 1.100.0
 
     - name: Cache cargo registry
       uses: actions/cache@v4
@@ -211,11 +216,23 @@ jobs:
     - name: Build CT verification benchmarks
       run: cargo build --release --bench ct_verification
 
+    - name: Locate CT verification binary
+      run: |
+        command -v jq >/dev/null || { sudo apt-get update && sudo apt-get install -y jq; }
+        CT_BINARY=$(cargo build --release --bench ct_verification --message-format=json \
+          | jq -r 'select(.reason=="compiler-artifact" and .target.name=="ct_verification" and .executable!=null) | .executable' \
+          | tail -1)
+        if [ -z "$CT_BINARY" ] || [ ! -x "$CT_BINARY" ]; then
+          echo "::error::INFRA: ct_verification bench executable not found (cargo build-dir layout?) - no CT measurement was taken"
+          exit 1
+        fi
+        echo "Binary: $CT_BINARY"
+        echo "CT_BINARY=$CT_BINARY" >> "$GITHUB_ENV"
+
     - name: Run extended constant-time verification (5 minutes per test)
       run: |
         echo "Running extended DudeCT analysis (5 min per test)..."
 
-        CT_BINARY=$(ls ./target/release/deps/ct_verification-* 2>/dev/null | head -1)
         mkdir -p ct_results_extended
 
         # All benchmarks including extended cryptographic scenarios
@@ -278,7 +295,9 @@ jobs:
       uses: actions/checkout@v4
 
     - name: Install Rust
-      uses: dtolnay/rust-toolchain@stable
+      uses: dtolnay/rust-toolchain@master
+      with:
+        toolchain: 1.100.0
 
     - name: Cache cargo registry
       uses: actions/cache@v4
@@ -294,12 +313,24 @@ jobs:
     - name: Build CT verification benchmarks
       run: cargo build --release --bench ct_verification
 
+    - name: Locate CT verification binary
+      run: |
+        command -v jq >/dev/null || { sudo apt-get update && sudo apt-get install -y jq; }
+        CT_BINARY=$(cargo build --release --bench ct_verification --message-format=json \
+          | jq -r 'select(.reason=="compiler-artifact" and .target.name=="ct_verification" and .executable!=null) | .executable' \
+          | tail -1)
+        if [ -z "$CT_BINARY" ] || [ ! -x "$CT_BINARY" ]; then
+          echo "::error::INFRA: ct_verification bench executable not found (cargo build-dir layout?) - no CT measurement was taken"
+          exit 1
+        fi
+        echo "Binary: $CT_BINARY"
+        echo "CT_BINARY=$CT_BINARY" >> "$GITHUB_ENV"
+
     - name: Run ARM64 constant-time verification
       run: |
         echo "Running ARM64 DudeCT verification..."
         echo "Architecture: $(uname -m)"
 
-        CT_BINARY=$(ls ./target/release/deps/ct_verification-* 2>/dev/null | head -1)
         mkdir -p ct_results_arm64
 
         # Core benchmarks for ARM64 verification
@@ -370,7 +401,9 @@ jobs:
       uses: actions/checkout@v4
 
     - name: Install Rust
-      uses: dtolnay/rust-toolchain@stable
+      uses: dtolnay/rust-toolchain@master
+      with:
+        toolchain: 1.100.0
 
     - name: Install stress tools
       run: sudo apt-get update && sudo apt-get install -y stress-ng
@@ -387,12 +420,24 @@ jobs:
     - name: Build CT verification benchmarks
       run: cargo build --release --bench ct_verification
 
+    - name: Locate CT verification binary
+      run: |
+        command -v jq >/dev/null || { sudo apt-get update && sudo apt-get install -y jq; }
+        CT_BINARY=$(cargo build --release --bench ct_verification --message-format=json \
+          | jq -r 'select(.reason=="compiler-artifact" and .target.name=="ct_verification" and .executable!=null) | .executable' \
+          | tail -1)
+        if [ -z "$CT_BINARY" ] || [ ! -x "$CT_BINARY" ]; then
+          echo "::error::INFRA: ct_verification bench executable not found (cargo build-dir layout?) - no CT measurement was taken"
+          exit 1
+        fi
+        echo "Binary: $CT_BINARY"
+        echo "CT_BINARY=$CT_BINARY" >> "$GITHUB_ENV"
+
     - name: Run chaos constant-time verification
       run: |
         echo "Running chaos CT verification under CPU stress..."
         echo "This tests that constant-time properties hold even under adverse conditions."
 
-        CT_BINARY=$(ls ./target/release/deps/ct_verification-* 2>/dev/null | head -1)
         mkdir -p ct_results_chaos
 
         # Core benchmarks to test under stress
